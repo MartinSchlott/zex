@@ -162,7 +162,6 @@ When all tests pass, you should see:
 
 ## Notes
 
-- Tests use a mock `isValidUri` function that always returns `true` and logs calls
 - All tests are designed to be independent and can run in any order
 - The test suite validates both functionality and API consistency
 - Error handling is tested where appropriate
