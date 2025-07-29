@@ -1,0 +1,247 @@
+---
+description: Zex - The better Zod
+alwaysApply: false
+---
+
+# 🧪 Zex – the better Zod
+
+**Ein Zod-kompatibler Validator mit sauberen TypeScript-Types statt Generic-Wrapper-Hell**
+
+## 🎯 Das Problem: Zod's API ist gut, die Types sind Müll
+
+Zod hat die **perfekte API** – aber schreckliche TypeScript-Inferenz:
+
+```typescript
+// Zod API - perfekt lesbar:
+const userSchema = z.object({
+  name: z.string().optional(),
+  age: z.number(),
+  email: z.string().email()
+});
+
+// Aber der inferierte Typ ist ein Monster:
+type User = z.infer<typeof userSchema>;
+// => ZodInfer<ZodObject<{ name: ZodOptional<ZodString>, age: ZodNumber, ... }>>
+```
+
+**In VS Code siehst du endlose Generic-Wrapper** statt sauberer Types. Debugging wird zum Alptraum.
+
+## ✅ Die Lösung: Gleiche API, saubere Types
+
+**Zex behält Zod's perfekte API**, gibt dir aber **clean TypeScript Types**:
+
+```typescript
+// Exakt gleiche Schreibweise wie Zod:
+const userSchema = zex.object({
+  name: zex.string().optional(),
+  age: zex.number(),
+  email: zex.string().email()
+});
+
+// Aber saubere Type-Inferenz:
+type User = zex.infer<typeof userSchema>;
+// => { name?: string; age: number; email: string }
+```
+
+**Kein Wrapper-Hell. Keine Generic-Hölle. Nur saubere Types.**
+
+## 🔄 Drop-in Replacement für Zod
+
+Zex ist als **100% kompatibler Zod-Ersatz** gedacht:
+
+```typescript
+// Vorher:
+import { z } from 'zod';
+const schema = z.string().optional();
+
+// Nachher:
+import { zex } from 'zex';  
+const schema = zex.string().optional();
+
+// Gleiche API, bessere Types!
+```
+
+**Alle Zod-Methoden funktionieren identisch:**
+- `zex.string()`, `zex.number()`, `zex.boolean()`
+- `zex.object()`, `zex.array()`, `zex.union()`
+- `.optional()`, `.nullable()`, `.default()`
+- `.email()`, `.min()`, `.max()` usw.
+
+## 🏗️ Technische Architektur
+
+### Class-basiertes Design ohne Generic-Wrapper
+
+Zex nutzt **Klassen-Vererbung** statt verschachtelter Generics:
+
+```typescript
+// Basis-Klasse mit Flag-System:
+class ZexBase<T> {
+  protected config: ZexConfig = {
+    optional: false,
+    nullable: false,
+    validators: [],
+    meta: {}
+  };
+}
+
+// Konkrete Typen ohne Wrapper:
+class ZexString extends ZexBase<string> {
+  optional(): ZexString {  // Gibt sich selbst zurück, kein Wrapper!
+    return new ZexString({ ...this.config, optional: true });
+  }
+  
+  min(length: number): ZexString {  // Chaining ohne Generic-Hell
+    return this.addValidator(minLengthValidator(length));
+  }
+}
+```
+
+### Interne Struktur
+
+```typescript
+interface ZexConfig {
+  optional: boolean;
+  nullable: boolean;
+  validators: Array<Validator>;  // min, max, email, uuid, etc.
+  meta: Record<string, any>;     // Beliebige Metadaten
+}
+```
+
+## 📋 First-Class Metadata Support
+
+Zex bietet **ergonomische Metadata-Methoden** für JSON Schema:
+
+```typescript
+const apiSchema = zex.string()
+  .title("Username")
+  .description("User's login name")
+  .deprecated(true)
+  .format("email")
+  .mimeFormat("application/json")
+  .meta({ 
+    customField: "value",
+    openapi: { example: "john_doe" }
+  });
+```
+
+**Alle Aufrufe mergen mit dem bestehenden meta-Object:**
+- `.title()` → setzt `meta.title`
+- `.description()` → setzt `meta.description`  
+- `.meta()` → merged beliebige Keys
+- First-class methods für Standard JSON Schema Properties
+
+## 🌐 JSON Schema Integration
+
+**Direkter Export zu JSON Schema Draft 2020-12:**
+
+```typescript
+const schema = zex.object({
+  name: zex.string().title("Name"),
+  age: zex.number().min(0).max(120)
+});
+
+// Einfacher Export:
+const jsonSchema = schema.toJsonSchema();
+
+// Mit Parametern für Feinjustierung:
+const jsonSchema = schema.toJsonSchema({
+  additionalProperties: false,
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+});
+```
+
+## 🔗 Union Types Support
+
+```typescript
+// Unions ohne Generic-Komplexität:
+const statusSchema = zex.union(
+  zex.literal("pending"),
+  zex.literal("approved"), 
+  zex.literal("rejected")
+);
+
+type Status = zex.infer<typeof statusSchema>;
+// => "pending" | "approved" | "rejected"
+
+// Komplexere Unions:
+const dataSchema = zex.union(
+  zex.string(),
+  zex.number(),
+  zex.object({ type: zex.literal("custom") })
+);
+```
+
+## ⚡ Praktisches Beispiel
+
+```typescript
+import { zex } from 'zex';
+
+// Schema definieren (identisch zu Zod):
+const apiSchema = zex.object({
+  userId: zex.string().uuid().title("User ID"),
+  data: zex.array(zex.object({
+    name: zex.string().min(1).title("Name"),
+    age: zex.number().optional().min(0).max(120),
+    status: zex.union(
+      zex.literal("active"),
+      zex.literal("inactive")
+    ).default("active")
+  })).description("User data array")
+});
+
+// Clean Type-Inferenz:
+type ApiRequest = zex.infer<typeof apiSchema>;
+// => {
+//   userId: string;
+//   data: Array<{
+//     name: string;
+//     age?: number;
+//     status: "active" | "inactive";
+//   }>;
+// }
+
+// Runtime-Validation (wie bei Zod):
+const result = apiSchema.parse(inputData);
+
+// Bessere Fehlermeldungen:
+// Statt: "Expected ZodString, received ZodNumber"  
+// Zex:   "Field 'data[0].age' expected number, got string"
+
+// JSON Schema Export:
+const jsonSchema = apiSchema.toJsonSchema({
+  title: "API Request Schema",
+  additionalProperties: false
+});
+```
+
+## 🎯 Warum Zex besser ist
+
+| Feature | Zod | Zex |
+|---------|-----|-----|
+| **API** | ✅ Perfekt | ✅ Identisch zu Zod |
+| **TypeScript Types** | ❌ Wrapper-Hell | ✅ Saubere Types |
+| **Debugging** | ❌ Unmöglich | ✅ Kristallklar |
+| **Performance** | ⚠️ Wrapper-Overhead | ✅ Optimiert |
+| **JSON Schema** | ❌ 3rd-party | ✅ Built-in 2020-12 |
+| **Migration** | - | ✅ Drop-in Replacement |
+| **Metadata** | ⚠️ Begrenzt | ✅ First-class + flexibel |
+| **Unions** | ❌ Generic-Chaos | ✅ Clean Types |
+
+## 🛠️ Implementation
+
+**Zex behält Zod's chainable API** bei, verwendet aber intern:
+
+- ✅ **Klassen-Vererbung** statt Generic-Wrapper
+- ✅ **Flag-basierte Konfiguration** für optional/nullable
+- ✅ **Validator-Arrays** für Runtime-Checks
+- ✅ **Flexible Meta-Objects** für JSON Schema
+- ✅ **Clean Type-Inferenz** ohne Template-Hell
+
+**Das Resultat:**
+- ✅ **Gleiche Entwicklererfahrung** wie Zod
+- ✅ **Saubere TypeScript-Inferenz** ohne Wrapper
+- ✅ **Bessere Performance** durch optimierte Internals
+- ✅ **Nahtlose Migration** von bestehenden Zod-Projekten
+- ✅ **Native JSON Schema Support** für APIs
+
+**Zex = Zod's API + Clean Types + Better DX + JSON Schema**

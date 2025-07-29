@@ -1,0 +1,138 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Software Specification Guide
+
+This guide outlines the approach and structure for creating effective software specifications that precisely communicate technical requirements to coding AI assistants.
+
+## Core Principles
+
+### Iterative Approach
+
+Specifications should be developed in multiple iterations:
+1. **Eagle-Eye Overview** - Start with a high-level overview of the entire system
+2. **Module Identification** - Break down the system into independent modules
+3. **Interface Definition** - Define interfaces between modules with sufficient detail
+4. **Module Detailing** - Elaborate each module individually
+
+This approach ensures that modules can be developed independently by different teams or AI assistants while maintaining system cohesion.
+
+### Key Focuses
+
+When creating specifications for software components, focus on:
+
+1. **Language Clarity**: Write specifications in English using clear, unambiguous language.
+2. **Appropriate Detail Level**: Include details the AI coder needs to know but cannot infer, while omitting self-evident aspects that any capable AI would understand.
+3. **Interface-First Approach**: Define interfaces thoroughly before implementation details.
+4. **Configuration Requirements**: Specify configuration mechanisms, formats, and required parameters.
+5. **Separation of Concerns**: Organize specifications by component or feature with clear boundaries.
+
+## Specification Structure
+
+A well-structured specification typically includes:
+
+### 1. Overview
+- Brief description of the component's purpose
+- Context within the larger system
+- Key functionality in bullet points
+
+### 2. Configuration
+- How the component is initialized
+- Configuration file format examples
+- Required and optional configuration parameters
+
+### 3. Interfaces
+- Input/output contracts
+- Data structures and types (using TypeScript interfaces where appropriate)
+- Parameter descriptions
+- Return value formats
+
+### 4. External Dependencies
+- External APIs
+- Authentication requirements
+- Endpoint specifications
+- Request/response examples
+
+### 5. Implementation Notes
+- Critical algorithms or approaches
+- Non-obvious edge cases
+- Error handling requirements
+
+### 6. Omit What's Obvious
+- Avoid explaining standard programming patterns
+- Don't detail implementation of commodity functions
+- Skip explanations of well-known frameworks
+
+## Format Requirements
+
+- Use Markdown for all specifications
+- Employ code blocks with language hints for code samples
+- Use TypeScript interfaces to precisely define data structures
+- Provide concrete examples of input/output behavior
+- Include sample requests/responses for external APIs
+
+## Tips for Effective Specs
+
+- Focus on the "what" rather than the "how" when possible
+- Define clear acceptance criteria
+- Provide examples for complex interactions
+- Mention required error handling
+- Include any performance requirements or constraints
+- Keep specification documents focused on a single component or feature
+
+Remember: The goal is to communicate essential information that the AI implementation needs but cannot reasonably infer from general programming knowledge.
+
+## Project Context
+
+### Development Stage
+- Clearly specify whether the specification is for a:
+  - **Proof of Concept (PoC)**: Focus on validating key technical assumptions with minimal overhead
+  - **Minimum Viable Product (MVP)**: Include core features needed for user validation
+  - **Production System**: Detail comprehensive requirements including non-functional aspects
+- Adjust detail level and scope accordingly based on the stage
+
+### Audience Consideration
+- **AI-First Documentation**: Unless specified otherwise, assume all documentation is primarily written for AI assistants
+- Focus on structured, explicit information that AI systems can reliably process
+- Include more formal definitions and clear boundaries than would be necessary for human developers
+
+### Scope Discipline
+
+- **No Future Features**: Specifications should only include features that are to be implemented now
+- **Avoid "Nice-to-Haves"**: Don't include speculative capabilities or potential enhancements
+- **Focus on Current Requirements**: Document only what is needed for the current development phase
+- **Prevent Scope Creep**: Resist the temptation to add "while we're at it" features
+- **Separate Future Planning**: Keep future roadmap items in separate documents, not in implementation specs
+
+Remember: AI developers are highly generative and may expand scope if given ambiguous boundaries. Speculative features in documentation provide "fuel for imagination" that can lead to scope expansion, technical debt, and project delays.
+
+## Pre-Documentation Discussion
+
+Before documenting specifications:
+- Explore different approaches and alternatives for key components
+- Challenge assumptions and discuss technical trade-offs
+- Establish architectural decisions and their rationales
+- Identify areas of technical uncertainty that may need validation
+- Agree on terminology and naming conventions
+
+This exploration phase helps ensure the documented specification represents well-considered decisions rather than initial thoughts.
+
+## Collaboration Workflow
+
+When collaborating on specifications with AI assistants:
+
+1. **Step-by-Step Approach**: Work on one section or module at a time rather than attempting to develop the entire specification at once.
+
+2. **Approval Before Implementation**: The AI should propose changes or additions for review before implementing them. This includes:
+   - Suggesting content modifications rather than directly editing files
+   - Creating one file at a time, with explicit approval before proceeding
+   - Providing drafts for review before finalizing
+
+3. **Iterative Refinement**: Both parties should expect multiple review cycles before finalizing a specification.
+
+4. **Clear Communication**: The AI should explicitly ask for approval before:
+   - Creating new files
+   - Making significant edits to existing files
+   - Moving on to the next section or module

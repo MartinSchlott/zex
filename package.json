@@ -1,0 +1,47 @@
+{
+  "name": "zex",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "test": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/run-all-tests.ts",
+    "test:basic": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/basic-functionality.test.ts",
+    "test:llm": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/llm-schema.test.ts",
+    "test:node": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/node-structure.test.ts",
+    "test:type": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/mytest.ts",
+    "start": "node --enable-source-maps dist/index.js",
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/index.ts"
+  },
+  "keywords": ["schema", "validation", "typescript", "zod", "alternative"],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "your-repo-url"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,269 @@
+// index.ts - Public API for Zex
+// =============================================================================
+
+import { JsonSchema } from './types.js';
+import { ZexBase } from './base.js';
+import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
+import { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple } from './complex-types.js';
+import { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
+
+// Public API
+export const zex = {
+  // Basic types
+  string: () => new ZexString(),
+  number: () => new ZexNumber(),
+  boolean: () => new ZexBoolean(),
+  any: () => new ZexAny(),
+  null: () => new ZexNull(),
+  buffer: (mimeType?: string) => new ZexBuffer(mimeType),
+  enum: <T extends readonly unknown[]>(values: T) => new ZexEnum(values),
+
+  // Complex types
+  array: <T extends ZexBase<any, any>>(schema: T) => new ZexArray(schema),
+  object: <T extends Record<string, ZexBase<any, any>>>(shape: T, allowAdditionalProperties: boolean = false, mode: "strict" | "passthrough" | "strip" = "strict") => new ZexObject(shape, undefined, allowAdditionalProperties, mode),
+  record: <T extends ZexBase<any, any>>(valueSchema: T) => new ZexRecord(valueSchema),
+  tuple: <T extends readonly ZexBase<any, any>[]>(schemas: T) => new ZexTuple(schemas),
+  union: <T extends readonly ZexBase<any, any>[]>(...schemas: T) => new ZexUnion(schemas),
+  literal: <T>(value: T) => new ZexLiteral(value),
+
+  // Special types
+  uri: () => new ZexUri(),
+  url: () => new ZexUrl(),
+  jsonschema: () => new ZexJsonSchema(),
+
+  // JSON Schema utility
+  toJSONSchema: (schema: ZexBase<unknown>, options?: { additionalProperties?: boolean; $schema?: string }): JsonSchema => {
+    return schema.toJSONSchema(options);
+  },
+
+  // Parser functions
+  fromJsonSchema: (schema: any, options?: { rootName?: string }) => fromJsonSchema(schema, options),
+  safeFromJsonSchema: (schema: any, options?: { rootName?: string }) => safeFromJsonSchema(schema, options),
+  transformLua: (data: unknown, schema: ZexBase<unknown>) => transformLua(data, schema),
+
+  // Path tracking helper
+  rootParseInfo: (description: string) => ({ rootDescription: description })
+};
+
+// Flags werden in den finalen Typ umgewandelt
+type ApplyFlags<T, Flags> = 
+  // Optional: T | undefined
+  (Flags extends { optional: true } 
+    ? T | undefined 
+    : T
+  ) &
+  // Nullable: T | null  
+  (Flags extends { nullable: true } 
+    ? T | null 
+    : T
+  );
+
+// Global type inference helper
+export type infer<T extends ZexBase<any, any>> = T extends ZexBase<infer U, infer Flags>
+  ? ApplyFlags<U, Flags>
+  : never;
+
+// Namespace version for compatibility
+export namespace zex {
+  export type infer<T extends ZexBase<any, any>> = T extends ZexBase<infer U, infer Flags>
+    ? ApplyFlags<U, Flags>
+    : never;
+}
+
+// --- fromJsonSchema Implementation ---
+
+function buildPathString(path: (string | number)[], root?: string): string {
+  return (root ? [root, ...path] : path).join(".");
+}
+
+function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
+  if (!schema || typeof schema !== "object") {
+    throw new Error(`fromJsonSchema: Invalid schema at path '${buildPathString(path, root)}'`);
+  }
+
+  // Meta-Felder extrahieren
+  const meta: Record<string, unknown> = {};
+  if (schema.title) meta.title = schema.title;
+  if (schema.description) meta.description = schema.description;
+  if (schema.examples) meta.examples = schema.examples;
+  if (schema.format) meta.format = schema.format;
+  // Alle nicht-standardisierten Felder als Meta-Daten übernehmen
+  for (const k of Object.keys(schema)) {
+    if (["title","description","examples","format","type","properties","items","required","enum","anyOf","allOf","oneOf","additionalProperties","minLength","maxLength","minimum","maximum","pattern"].indexOf(k) === -1) {
+      meta[k] = schema[k];
+    }
+  }
+
+  // URI-Schema Spezialbehandlung
+  if (schema.type === "string" && schema.format === "uri") {
+    return zex.uri().meta(meta) as ZexBase<any>;
+  }
+
+  // URL-Schema Spezialbehandlung
+  if (schema.type === "string" && schema.format === "uri-reference") {
+    return zex.url().meta(meta) as ZexBase<any>;
+  }
+
+  // Buffer-Schema Spezialbehandlung
+  if (schema.type === "object" && schema.format === "buffer") {
+    return zex.buffer(schema.contentMediaType).meta(meta) as ZexBase<any>;
+  }
+
+  // Basistypen mit Rekonstruktion der Validatoren
+  if (schema.type === "string") {
+    let stringSchema = zex.string();
+    
+    if (schema.minLength !== undefined) {
+      stringSchema = stringSchema.min(schema.minLength);
+    }
+    if (schema.maxLength !== undefined) {
+      stringSchema = stringSchema.max(schema.maxLength);
+    }
+    if (schema.format === 'email') {
+      stringSchema = stringSchema.email();
+    }
+    if (schema.format === 'uuid') {
+      stringSchema = stringSchema.uuid();
+    }
+    if (schema.pattern !== undefined) {
+      stringSchema = stringSchema.pattern(schema.pattern);
+    }
+    
+    return stringSchema.meta(meta) as ZexBase<any>;
+  }
+  
+  if (schema.type === "number" || schema.type === "integer") {
+    let numberSchema = zex.number();
+    
+    if (schema.minimum !== undefined) {
+      numberSchema = numberSchema.min(schema.minimum);
+    }
+    if (schema.maximum !== undefined) {
+      numberSchema = numberSchema.max(schema.maximum);
+    }
+    if (schema.type === 'integer') {
+      numberSchema = numberSchema.int();
+    }
+    
+    return numberSchema.meta(meta) as ZexBase<any>;
+  }
+  
+  if (schema.type === "boolean") {
+    return zex.boolean().meta(meta) as ZexBase<any>;
+  }
+  
+  // Arrays und Objekte (Logik unverändert)
+  if (schema.type === "array") {
+    // Check for tuple (fixed-length array with prefixItems)
+    if (schema.prefixItems && Array.isArray(schema.prefixItems)) {
+      const tupleSchemas = schema.prefixItems.map((itemSchema: any, i: number) => 
+        fromJsonSchemaInternal(itemSchema, [...path, `prefixItems[${i}]`], root)
+      );
+      return zex.tuple(tupleSchemas).meta(meta) as ZexBase<any>;
+    }
+    
+    // Regular array
+    if (!schema.items) throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${buildPathString(path, root)}'`);
+    
+    // Handle array items that might be enum schemas
+    const itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root);
+    return zex.array(itemSchema).meta(meta) as ZexBase<any>;
+  }
+  
+  if (schema.type === "object") {
+    // Check for record type (object with additionalProperties but no properties)
+    if (schema.additionalProperties !== undefined && (!schema.properties || Object.keys(schema.properties).length === 0)) {
+      let valueSchema: ZexBase<any>;
+      if (schema.additionalProperties === true || (typeof schema.additionalProperties === 'object' && Object.keys(schema.additionalProperties).length === 0)) {
+        // additionalProperties: true or {} means any value
+        valueSchema = zex.any();
+      } else if (schema.additionalProperties === false) {
+        // additionalProperties: false means no additional properties allowed
+        // This should not be a record type, but a strict object
+        return zex.object({}, false, "strict").meta(meta) as ZexBase<any>;
+      } else {
+        // additionalProperties: schema means specific schema
+        valueSchema = fromJsonSchemaInternal(schema.additionalProperties, [...path, "additionalProperties"], root);
+      }
+      return zex.record(valueSchema).meta(meta) as ZexBase<any>;
+    }
+    
+    // Regular object
+    const shape: Record<string, ZexBase<any>> = {};
+    const required: string[] = Array.isArray(schema.required) ? schema.required : [];
+    
+    // Handle objects with or without properties
+    if (schema.properties && typeof schema.properties === "object") {
+      for (const [key, propSchema] of Object.entries(schema.properties)) {
+        let z = fromJsonSchemaInternal(propSchema, [...path, key], root);
+        if (!required.includes(key)) z = z.optional();
+        shape[key] = z;
+      }
+    }
+    
+    // Determine if additional properties should be allowed and mode
+    let allowAdditionalProps = false;
+    let mode: "strict" | "passthrough" | "strip" = "strict";
+    if (schema.additionalProperties === true) {
+      allowAdditionalProps = true;
+      mode = "passthrough";
+    } else if (schema.additionalProperties === false) {
+      allowAdditionalProps = false;
+      mode = "strict";
+    } else if (schema.additionalProperties === undefined) {
+      // If no additionalProperties is specified and no properties are defined,
+      // default to allowing additional properties (common in OpenAPI)
+      if (!schema.properties || Object.keys(schema.properties || {}).length === 0) {
+        allowAdditionalProps = true;
+        mode = "passthrough";
+      }
+    }
+    // Create object schema with appropriate additionalProperties setting and mode
+    const objectSchema = zex.object(shape, allowAdditionalProps, mode).meta(meta) as ZexBase<any>;
+    
+    return objectSchema;
+  }
+  
+  // Handle enum arrays (must come before other checks)
+  if (Array.isArray(schema.enum)) {
+    return zex.enum(schema.enum as any[]).meta(meta) as ZexBase<any>;
+  }
+  
+  if (Array.isArray(schema.anyOf)) {
+    return zex.union(...(schema.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `anyOf[${i}]`], root)))).meta(meta) as ZexBase<any>;
+  }
+
+  // Handle const values (literals)
+  if (schema.const !== undefined) {
+    return zex.literal(schema.const).meta(meta) as ZexBase<any>;
+  }
+  
+  throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${buildPathString(path, root)}'`);
+}
+
+// Internal functions (not exported)
+function fromJsonSchema(schema: any, options?: { rootName?: string }): ZexBase<any> {
+  return fromJsonSchemaInternal(schema, [], options?.rootName);
+}
+
+function safeFromJsonSchema(schema: any, options?: { rootName?: string }): { success: true; schema: ZexBase<any> } | { success: false; error: string } {
+  try {
+    const z = fromJsonSchemaInternal(schema, [], options?.rootName);
+    return { success: true, schema: z };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// Internal function (not exported)
+function transformLua(data: unknown, schema: ZexBase<unknown>): unknown {
+  return (schema as any).transformLua(data);
+}
+
+// Re-export types for external use
+export type { JsonSchema, ValidationResult, ZexConfig, Validator } from './types.js';
+export { ZexError } from './types.js';
+export type { ZexBase } from './base.js';
+export type { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
+export type { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple } from './complex-types.js';
+export type { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js'; 
