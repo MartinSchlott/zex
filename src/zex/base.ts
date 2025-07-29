@@ -289,6 +289,11 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
       ...this.config.meta // Meta-Daten haben die höchste Priorität
     };
 
+    // Include default value in JSON schema if present
+    if (this.config.defaultValue !== undefined) {
+      schema.default = this.config.defaultValue;
+    }
+
     if (options?.additionalProperties !== undefined) {
       schema.additionalProperties = options.additionalProperties;
     }

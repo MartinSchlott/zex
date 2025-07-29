@@ -93,6 +93,7 @@ The test suite covers:
 
 ### ✅ JSON Schema Generation
 - Meta data inclusion in generated schemas
+- Default values in generated schemas
 - Complex nested object schemas
 - Array and record schemas
 - Special format fields (URI format)
@@ -165,4 +166,5 @@ When all tests pass, you should see:
 - All tests are designed to be independent and can run in any order
 - The test suite validates both functionality and API consistency
 - Error handling is tested where appropriate
-- Complex scenarios test the integration of all zex features 
+- Complex scenarios test the integration of all zex features
+- Default value handling in JSON schema generation 

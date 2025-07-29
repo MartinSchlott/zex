@@ -7,6 +7,7 @@ export type JsonSchema = {
   title?: string;
   description?: string;
   examples?: unknown[];
+  default?: unknown;
   properties?: Record<string, JsonSchema>;
   items?: JsonSchema;
   required?: string[];
