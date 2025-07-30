@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2025-07-30
+
+### Fixed
+- **Package Exports**: Fixed critical issue where classes were not properly exported from the main package
+  - `ZexTuple`, `ZexArray`, `ZexObject`, etc. can now be imported directly from `@ai-inquisitor/zex`
+  - Resolves `Cannot find module` errors when importing classes in consuming projects
+  - Updated main `index.ts` to use `export *` for complete re-export of all classes
+
+### Technical Details
+- Fixed `src/index.ts` to properly re-export all classes from `./zex/index.js`
+- All classes (`ZexBase`, `ZexString`, `ZexNumber`, `ZexBoolean`, `ZexArray`, `ZexObject`, `ZexTuple`, etc.) are now properly exported
+- Build process now generates correct TypeScript definitions
+
+### Examples
+
+```typescript
+// ✅ Now works - direct class import
+import { ZexTuple } from '@ai-inquisitor/zex';
+
+export interface ClarionFunction {
+  name: string;
+  schema: ZexTuple<any>; // ZexTuple is now available as a value
+}
+
+// ✅ Direct instantiation also works
+const tuple = new ZexTuple([new ZexString(), new ZexNumber()]);
+```
+
 ## [0.1.3] - 2025-07-30
 
 ### Fixed
