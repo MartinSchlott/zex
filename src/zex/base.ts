@@ -65,6 +65,9 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this.clone(newConfig);
   }
 
+  // Method overloading for meta
+  meta(): Record<string, unknown>;
+  meta(meta: Record<string, unknown>): this;
   meta(meta?: Record<string, unknown>): this | Record<string, unknown> {
     if (meta) {
       const newConfig: ZexConfig = {
@@ -73,7 +76,7 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
       };
       return this.clone(newConfig);
     }
-    return this.config.meta as Record<string, unknown>;
+    return this.config.meta;
   }
 
   // Transformation methods with proper Flag-Tracking AND IMMUTABILITY

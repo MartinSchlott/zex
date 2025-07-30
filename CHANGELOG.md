@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2025-07-30
+
+### Fixed
+- **meta() Method**: Fixed critical bug where `meta()` method only worked as setter, not as getter
+  - `schema.meta()` now returns metadata (getter functionality)
+  - `schema.meta({...})` still sets metadata (setter functionality)
+  - Method overloading properly implemented for Zod-compatible API
+  - Resolves issue where metadata could not be accessed after setting
+
+### Technical Details
+- Implemented TypeScript method overloading for `meta()` method
+- Removed temporary `getMetadata()` method
+- Maintains full backward compatibility
+- TypeScript correctly resolves getter vs setter calls
+
+### Examples
+
+```typescript
+// Setter (with parameter)
+const schema = zex.string().meta({
+  "x-ui": { "multiline": true, "placeholder": "..." }
+});
+
+// Getter (without parameter)
+const metadata = schema.meta();
+const xUi = schema.meta()["x-ui"];
+console.log(xUi.multiline); // true
+console.log(xUi.placeholder); // "..."
+
+// Utility function
+function getXUiMetadata(schema: any) {
+  return schema.meta()["x-ui"];
+}
+```
+
 ## [0.1.4] - 2025-07-30
 
 ### Fixed
