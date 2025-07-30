@@ -17,6 +17,8 @@ export type JsonSchema = {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
   pattern?: string;
   [key: string]: unknown;
 };

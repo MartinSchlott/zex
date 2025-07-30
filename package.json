@@ -29,7 +29,8 @@
     "test:node": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/node-structure.test.ts",
     "test:type": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/mytest.ts",
     "start": "node --enable-source-maps dist/index.js",
-    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/index.ts"
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/index.ts",
+    "publish": "npm publish --access public"
   },
   "keywords": ["schema", "validation", "typescript", "zod", "alternative"],
   "author": "Your Name",

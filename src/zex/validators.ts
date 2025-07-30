@@ -142,4 +142,40 @@ export class IntValidator implements Validator {
   getJsonSchema(): Partial<JsonSchema> {
     return { type: 'integer' };
   }
+}
+
+export class ArrayMinLengthValidator implements Validator {
+  constructor(private minLength: number) {}
+
+  validate(value: unknown): ValidationResult {
+    if (!Array.isArray(value)) {
+      return { success: false, error: 'Expected array' };
+    }
+    if (value.length < this.minLength) {
+      return { success: false, error: `Array must have at least ${this.minLength} items` };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { minItems: this.minLength };
+  }
+}
+
+export class ArrayMaxLengthValidator implements Validator {
+  constructor(private maxLength: number) {}
+
+  validate(value: unknown): ValidationResult {
+    if (!Array.isArray(value)) {
+      return { success: false, error: 'Expected array' };
+    }
+    if (value.length > this.maxLength) {
+      return { success: false, error: `Array must have at most ${this.maxLength} items` };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { maxItems: this.maxLength };
+  }
 } 

@@ -3,6 +3,10 @@
 
 import { JsonSchema, PathEntry, ZexConfig, ZexError } from './types.js';
 import { ZexBase } from './base.js';
+import { 
+  ArrayMinLengthValidator,
+  ArrayMaxLengthValidator
+} from './validators.js';
 
 // =============================================================================
 // LOKALE HELFER-TYPEN ZUR VERMEIDUNG VON ZIRKULÄREN ABHÄNGIGKEITEN
@@ -107,6 +111,14 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
       }];
       return (this.itemSchema as any)._parse(item, elementPath);
     });
+  }
+
+  min(minLength: number): ZexArray<T> {
+    return this.addValidator(new ArrayMinLengthValidator(minLength)) as ZexArray<T>;
+  }
+
+  max(maxLength: number): ZexArray<T> {
+    return this.addValidator(new ArrayMaxLengthValidator(maxLength)) as ZexArray<T>;
   }
 }
 
