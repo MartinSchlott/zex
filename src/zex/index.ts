@@ -263,12 +263,8 @@ function transformLua(data: unknown, schema: ZexBase<unknown>): unknown {
 // Re-export types for external use
 export type { JsonSchema, ValidationResult, ZexConfig, Validator } from './types.js';
 export { ZexError } from './types.js';
-export type { ZexBase } from './base.js';
-export type { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
-export type { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple } from './complex-types.js';
-export type { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
 
-// Re-export classes for external use (as values)
+// Re-export classes for external use (as values and types)
 export { ZexBase } from './base.js';
 export { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
 export { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple } from './complex-types.js';
