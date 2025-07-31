@@ -68,6 +68,9 @@ export namespace zex {
   export type infer<T extends ZexBase<any, any>> = T extends ZexBase<infer U, infer Flags>
     ? ApplyFlags<U, Flags>
     : never;
+  
+  // Type aliases for better developer experience
+  export type ZexTypeAny = ZexBase<any, any>;
 }
 
 // --- fromJsonSchema Implementation ---
@@ -268,4 +271,7 @@ export { ZexError } from './types.js';
 export { ZexBase } from './base.js';
 export { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
 export { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple } from './complex-types.js';
-export { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js'; 
+export { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
+
+// Type aliases for better developer experience
+export type ZexTypeAny = ZexBase<any, any>; 

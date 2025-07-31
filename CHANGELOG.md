@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2025-07-30
+
+### Added
+- **ZexTypeAny Type Alias**: Added `zex.ZexTypeAny` as a convenient type alias for `ZexBase<any, any>`
+  - Improves developer experience by providing a more intuitive type name
+  - Maintains full compatibility with existing `ZexBase<any, any>` usage
+  - Available both as direct export and within the `zex` namespace
+  - Makes the API more consistent with Zod's `z.ZodTypeAny` pattern
+
+### Examples
+
+```typescript
+// ✅ New convenient type alias
+export const OperationResultSchema = <T extends zex.ZexTypeAny>(dataSchema: T) =>
+  zex.object({
+    success: zex.boolean(),
+    data: dataSchema.optional(),
+    error: zex.string().optional(),
+    context: zex.string().optional(),
+  });
+
+// ✅ Also available as direct import
+import { ZexTypeAny } from '@ai-inquisitor/zex';
+
+// ✅ Still works with existing ZexBase<any, any>
+export const LegacySchema = <T extends ZexBase<any, any>>(dataSchema: T) => // ...
+```
+
 ## [0.1.5] - 2025-07-30
 
 ### Fixed

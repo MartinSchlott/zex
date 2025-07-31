@@ -1,6 +1,6 @@
 # Zex - The Other Zod
 
-*A TypeScript-first schema validation library built in one day with AI assistance*
+*Zex - The Other Zod: it is like the guy who actually build the house, not dream of the perfect one.*
 
 ## Why Zex Exists
 
@@ -230,4 +230,4 @@ MIT - use it however you want. No warranty, no promises, but it works great for 
 
 ---
 
-*"Sometimes the best solution is to just build it yourself in a day rather than fight with existing tools for weeks."*
+*"Sometimes the best solution is to just build it yourself in a day rather than fight with existing tools for weeks."* - Cursor (auto)
