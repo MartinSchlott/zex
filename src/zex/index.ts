@@ -169,7 +169,13 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (!schema.items) throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${buildPathString(path, root)}'`);
     
     // Handle array items that might be enum schemas
-    const itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root);
+    let itemSchema: ZexBase<any>;
+    if (typeof schema.items === 'object' && Object.keys(schema.items).length === 0) {
+      // Empty items object means any type
+      itemSchema = zex.any();
+    } else {
+      itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root);
+    }
     return zex.array(itemSchema).meta(meta) as ZexBase<any>;
   }
   

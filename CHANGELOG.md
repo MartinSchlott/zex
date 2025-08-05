@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2025-01-27
+
+### Fixed
+- **JSON Schema Items Bug**: Fixed critical bug where `fromJsonSchema` failed to parse JSON Schema objects with empty `items` properties
+  - `zex.array(zex.any())` now generates `items: {}` which can be properly parsed by `fromJsonSchema`
+  - Resolves error: `fromJsonSchema: Unsupported or unknown schema feature at path 'params.items'`
+  - Particularly affects tool definitions that use array schemas with `zex.any()` items
+  - Maintains full backward compatibility with existing array schemas
+
+### Technical Details
+- Enhanced `fromJsonSchemaInternal` function to handle empty `items` objects as `zex.any()`
+- Added proper validation for empty `items` objects in array schemas
+- Improved error handling for malformed JSON Schema structures
+- Added comprehensive test suite to verify the fix
+
+### Examples
+
+```typescript
+// ✅ Now works - Tool schema with array parameters
+const toolInputSchema = zex.toJSONSchema(zex.object({
+  sql: zex.string().describe("SQL statement"),
+  params: zex.array(zex.any()).optional().describe("Statement parameters")
+}));
+
+// ✅ fromJsonSchema can now parse this schema
+const parsedSchema = zex.fromJsonSchema(toolInputSchema);
+
+// ✅ Tool call validation works
+const toolCallData = {
+  uri: "tool:/store/SQL-Database/execute",
+  params: {
+    sql: "INSERT INTO users (name, email) VALUES (?, ?)",
+    params: ["Max Mustermann", "max@example.com"]
+  }
+};
+const result = parsedSchema.parse(toolCallData);
+```
+
+### Tests Added
+- `json-schema-items-bug.test.ts` - Comprehensive test suite for JSON Schema items bug
+- `tool-jsonschema-items-bug.test.ts` - Tool-specific scenarios
+- `fixed-items-bug.test.ts` - Verification that the bug is fixed
+
 ## [0.1.6] - 2025-07-30
 
 ### Added
