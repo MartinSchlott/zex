@@ -3,6 +3,7 @@
 
 import { JsonSchema, PathEntry, ZexConfig, ZexError } from './types.js';
 import { ZexBase } from './base.js';
+import { ZexAny } from './basic-types.js';
 import { 
   ArrayMinLengthValidator,
   ArrayMaxLengthValidator
@@ -292,9 +293,15 @@ export class ZexRecord<T extends ZexBase<any, any>> extends ZexBase<Record<strin
   }
 
   protected getBaseJsonSchema(): JsonSchema {
+    // For maximum parser compatibility, always include properties: {} and use true for any
+    const additionalProps = this.valueSchema instanceof ZexAny 
+      ? true 
+      : this.valueSchema.toJsonSchema();
+    
     return {
       type: "object",
-      additionalProperties: this.valueSchema.toJsonSchema()
+      properties: {}, // Always include for parser compatibility
+      additionalProperties: additionalProps as any
     };
   }
 

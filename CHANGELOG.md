@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2025-01-27
+
+### Fixed
+- **Schema Parser Compatibility**: Fixed critical compatibility issues with JSON Schema parsers, especially OpenAI
+  - `zex.record(zex.any())` now generates parser-compatible schemas with `properties: {}` and `additionalProperties: true`
+  - Resolves issues where `additionalProperties: {}` (empty object) was not understood by many parsers
+  - Ensures maximum compatibility with OpenAI and other JSON Schema parsers
+  - Maintains full backward compatibility with existing schemas
+
+### Technical Details
+- Enhanced `ZexRecord` class to always include `properties: {}` for parser compatibility
+- Modified `additionalProperties` generation to use `true` instead of empty objects for `zex.any()`
+- Improved JSON Schema generation to follow parser-friendly patterns
+- Added comprehensive test suite to verify parser compatibility
+
+### Examples
+
+```typescript
+// ✅ Now generates parser-compatible schema
+const createInputSchema = zex.object({
+    uri: zex.string().describe("URI for the node to create"),
+    params: zex.record(zex.any()).optional().describe("Creation parameters")
+});
+
+// ✅ Generates OpenAI-compatible schema:
+// {
+//   "type": "object",
+//   "properties": {
+//     "uri": { "type": "string", "description": "..." },
+//     "params": {
+//       "type": "object",
+//       "properties": {},
+//       "additionalProperties": true
+//     }
+//   }
+// }
+```
+
+### Tests Added
+- `schema-parser-compatibility.test.ts` - Comprehensive test suite for parser compatibility
+- Verifies OpenAI compatibility and other JSON Schema parser compatibility
+
 ## [0.1.7] - 2025-01-27
 
 ### Fixed
