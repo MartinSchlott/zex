@@ -247,10 +247,33 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     return zex.literal(schema.const).meta(meta) as ZexBase<any>;
   }
   
-  throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${buildPathString(path, root)}'`);
+  // Provide more specific error messages for common issues
+  const pathString = buildPathString(path, root);
+  
+  // Check for empty object (missing type)
+  if (typeof schema === 'object' && schema !== null && Object.keys(schema).length === 0) {
+    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "any" } or true for any value.`);
+  }
+  
+  // Check for null schema
+  if (schema === null) {
+    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - null is not a valid schema. Use { type: "any" } or true for any value.`);
+  }
+  
+  // Check for schema without type
+  if (typeof schema === 'object' && schema !== null && !schema.type && !schema.enum && !schema.anyOf && !schema.allOf && !schema.oneOf && !schema.const && !schema.$ref) {
+    const keys = Object.keys(schema);
+    if (keys.length > 0) {
+      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "any" } for any value.`);
+    } else {
+      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "any" } or true for any value.`);
+    }
+  }
+  
+  throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${pathString}'`);
 }
 
-// Internal functions (not exported)
+// Public functions
 function fromJsonSchema(schema: any, options?: { rootName?: string }): ZexBase<any> {
   return fromJsonSchemaInternal(schema, [], options?.rootName);
 }
