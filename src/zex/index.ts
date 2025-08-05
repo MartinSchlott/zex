@@ -81,7 +81,10 @@ function buildPathString(path: (string | number)[], root?: string): string {
 
 function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
   if (!schema || typeof schema !== "object") {
-    throw new Error(`fromJsonSchema: Invalid schema at path '${buildPathString(path, root)}'`);
+    const pathString = buildPathString(path, root);
+    const schemaType = typeof schema;
+    const schemaValue = schema === null ? ' (null)' : '';
+    throw new Error(`fromJsonSchema: Invalid schema at path '${pathString}' - schema is ${schemaType}${schemaValue}. Expected a valid JSON Schema object.`);
   }
 
   // Meta-Felder extrahieren
@@ -166,7 +169,10 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     }
     
     // Regular array
-    if (!schema.items) throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${buildPathString(path, root)}'`);
+    if (!schema.items) {
+      const pathString = buildPathString(path, root);
+      throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${pathString}'. Add 'items' property with the schema for array elements.`);
+    }
     
     // Handle array items that might be enum schemas
     let itemSchema: ZexBase<any>;

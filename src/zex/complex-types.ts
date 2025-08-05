@@ -94,10 +94,11 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
     
     // Ensure validatedData is an array
     if (!Array.isArray(validatedData)) {
+      const dataType = typeof validatedData;
       throw new ZexError(
         path.map(p => p.key || String(p.index || 'root')),
         'type_mismatch',
-        'Expected array',
+        `Expected array, got ${dataType}`,
         validatedData,
         'array'
       );
@@ -181,7 +182,8 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
 
   protected validateType(data: unknown): { success: true } | { success: false; error: string } {
     if (typeof data !== 'object' || data === null) {
-      return { success: false, error: 'Expected object' };
+      const dataType = typeof data;
+      return { success: false, error: `Expected object, got ${dataType}` };
     }
 
     // Validate each field
@@ -316,7 +318,8 @@ export class ZexRecord<T extends ZexBase<any, any>> extends ZexBase<Record<strin
 
   protected validateType(data: unknown): { success: true } | { success: false; error: string } {
     if (typeof data !== 'object' || data === null) {
-      return { success: false, error: 'Expected object' };
+      const dataType = typeof data;
+      return { success: false, error: `Expected object, got ${dataType}` };
     }
 
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
@@ -358,7 +361,8 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
         return { success: true };
       }
     }
-    return { success: false, error: 'Value does not match any union type' };
+    const dataType = typeof data;
+    return { success: false, error: `Value does not match any union type. Got ${dataType}` };
   }
 
   protected _parse(data: unknown, path: PathEntry[]): InferProperty<T[number]> {
@@ -383,13 +387,13 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
     // Find the most specific error (shortest path = most specific)
     const bestError = errors.length > 0 
       ? errors.sort((a, b) => a.path.length - b.path.length)[0]
-      : new ZexError(
-          path.map(p => p.key || String(p.index || 'root')),
-          'union_mismatch',
-          'No union variant matched',
-          data,
-          'one of the union variants'
-        );
+              : new ZexError(
+            path.map(p => p.key || String(p.index || 'root')),
+            'union_mismatch',
+            `No union variant matched. Got ${typeof data}`,
+            data,
+            'one of the union variants'
+          );
     
     throw bestError;
   }

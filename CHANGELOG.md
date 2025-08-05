@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2025-01-27
+### Fixed
+- **Improved Error Messages**: Enhanced error messages throughout the library for better developer experience
+  - `fromJsonSchema` now provides specific error messages for invalid schema types, null values, and missing properties
+  - Array validation errors now include the actual data type and value received
+  - Object validation errors now show what type was received instead of expected object
+  - Union validation errors now include the received data type and value
+  - All error messages now include helpful suggestions for fixing the issue
+  - Added safe JSON.stringify handling to prevent crashes with circular references
+### Technical Details
+- Enhanced `fromJsonSchemaInternal` to provide more descriptive error messages
+- Improved `ZexArray`, `ZexObject`, `ZexRecord`, and `ZexUnion` error messages
+- Added try-catch blocks around JSON.stringify to handle non-serializable objects
+- Error messages now include actual data types and truncated values for better debugging
+### Examples
+```typescript
+// ✅ Before: "fromJsonSchema: Invalid schema at path 'Test'"
+// ✅ After: "fromJsonSchema: Invalid schema at path 'Test' - schema is string. Expected a valid JSON Schema object."
+
+// ✅ Before: "Expected array"
+// ✅ After: "Expected array, got string (not an array)"
+
+// ✅ Before: "Expected object"
+// ✅ After: "Expected object, got string (not an object)"
+
+// ✅ Before: "Value does not match any union type"
+// ✅ After: "Value does not match any union type. Got object ({ complex: 'object' })"
+```
+
 ## [0.1.8] - 2025-01-27
 
 ### Fixed
