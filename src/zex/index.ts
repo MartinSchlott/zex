@@ -258,21 +258,21 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
   
   // Check for empty object (missing type)
   if (typeof schema === 'object' && schema !== null && Object.keys(schema).length === 0) {
-    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "any" } or true for any value.`);
+    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
   }
   
   // Check for null schema
   if (schema === null) {
-    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - null is not a valid schema. Use { type: "any" } or true for any value.`);
+    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - null is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
   }
   
   // Check for schema without type
   if (typeof schema === 'object' && schema !== null && !schema.type && !schema.enum && !schema.anyOf && !schema.allOf && !schema.oneOf && !schema.const && !schema.$ref) {
     const keys = Object.keys(schema);
     if (keys.length > 0) {
-      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "any" } for any value.`);
+      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "object", additionalProperties: true } for any value.`);
     } else {
-      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "any" } or true for any value.`);
+      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
     }
   }
   

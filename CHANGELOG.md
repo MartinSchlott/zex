@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Improved Error Messages**: Enhanced error messages for invalid JSON Schema objects
+  - Fixed misleading error messages that suggested non-existent JSON Schema features
+  - Removed references to `{ type: "any" }` and `true` which are not valid in JSON Schema
+  - Updated error messages to suggest correct solutions like `{ type: "object", additionalProperties: true }`
+  - Improved error messages for empty objects, null schemas, and schemas without type fields
+### Technical Details
+- Enhanced `fromJsonSchemaInternal` error messages to be more accurate and helpful
+- Removed invalid JSON Schema suggestions from error messages
+- Error messages now provide working solutions that zex can actually parse
+### Examples
+```typescript
+// ✅ Before: "Use { type: "any" } or true for any value" (invalid)
+// ✅ After: "Use { type: "object", additionalProperties: true } or similar" (valid)
+
+// ✅ Before: "Use { type: "any" } for any value" (invalid)
+// ✅ After: "Add 'type' field or use { type: "object", additionalProperties: true } for any value" (valid)
+```
 
 ## [0.1.9] - 2025-01-27
 ### Fixed
