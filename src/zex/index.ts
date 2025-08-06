@@ -167,16 +167,16 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
       );
       return zex.tuple(tupleSchemas).meta(meta) as ZexBase<any>;
     }
-    
     // Regular array
     if (!schema.items) {
       const pathString = buildPathString(path, root);
       throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${pathString}'. Add 'items' property with the schema for array elements.`);
     }
-    
-    // Handle array items that might be enum schemas
+    // PATCH: Wenn items.anyOf vorhanden ist, baue ein Union-Schema als itemSchema
     let itemSchema: ZexBase<any>;
-    if (typeof schema.items === 'object' && Object.keys(schema.items).length === 0) {
+    if (schema.items && Array.isArray(schema.items.anyOf)) {
+      itemSchema = zex.union(...schema.items.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)));
+    } else if (typeof schema.items === 'object' && Object.keys(schema.items).length === 0) {
       // Empty items object means any type
       itemSchema = zex.any();
     } else {

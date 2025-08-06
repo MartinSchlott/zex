@@ -111,7 +111,11 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
         schema: this.itemSchema,
         description: (this.itemSchema as any).config?.meta?.description
       }];
-      return (this.itemSchema as any)._parse(item, elementPath);
+      try {
+        return (this.itemSchema as any)._parse(item, elementPath);
+      } catch (err) {
+        throw err;
+      }
     });
   }
 

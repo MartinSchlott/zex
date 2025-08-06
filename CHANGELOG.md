@@ -328,3 +328,31 @@ const jsonSchema = schema.toJsonSchema();
 - Basic Zod-compatible API structure
 - TypeScript configuration
 - Development environment setup 
+
+## [0.1.10] - 2025-01-27
+### Fixed
+- **Union Array Validation**: Fixed a critical bug where arrays with items using `anyOf` (union types) did not validate correctly
+  - Arrays with union item schemas now correctly validate each element against all union alternatives
+  - Prevents false negatives when array elements match a non-first union alternative
+  - Ensures full compatibility with JSON Schema arrays using `anyOf` for items
+
+### Technical Details
+- Patched `fromJsonSchemaInternal` to wrap array `items.anyOf` in a union schema before passing to `zex.array`
+- No side effects or breaking changes; only schema construction logic affected
+
+### Example
+```typescript
+// Before: Only the first anyOf alternative was checked for array items
+// After: All anyOf alternatives are checked for each array element
+
+const schema = {
+  type: "array",
+  items: {
+    anyOf: [
+      { type: "string" },
+      { type: "number" }
+    ]
+  }
+};
+// Now both strings and numbers are accepted in the array
+``` 
