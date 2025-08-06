@@ -80,6 +80,8 @@ function buildPathString(path: (string | number)[], root?: string): string {
 }
 
 function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
+  // eslint-disable-next-line no-console
+  console.log('[fromJsonSchemaInternal] called with:', { schema, path });
   if (!schema || typeof schema !== "object") {
     const pathString = buildPathString(path, root);
     const schemaType = typeof schema;
@@ -165,6 +167,8 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
       const tupleSchemas = schema.prefixItems.map((itemSchema: any, i: number) => 
         fromJsonSchemaInternal(itemSchema, [...path, `prefixItems[${i}]`], root)
       );
+      // eslint-disable-next-line no-console
+      console.log('[fromJsonSchemaInternal] tupleSchemas:', tupleSchemas);
       return zex.tuple(tupleSchemas).meta(meta) as ZexBase<any>;
     }
     // Regular array
@@ -175,14 +179,23 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     // PATCH: Wenn items.anyOf vorhanden ist, baue ein Union-Schema als itemSchema
     let itemSchema: ZexBase<any>;
     if (schema.items && Array.isArray(schema.items.anyOf)) {
+      // eslint-disable-next-line no-console
+      console.log('[fromJsonSchemaInternal] Detected items.anyOf in array:', schema.items.anyOf);
       itemSchema = zex.union(...schema.items.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)));
+      // eslint-disable-next-line no-console
+      console.log('[fromJsonSchemaInternal] Built union itemSchema:', itemSchema);
     } else if (typeof schema.items === 'object' && Object.keys(schema.items).length === 0) {
       // Empty items object means any type
       itemSchema = zex.any();
     } else {
       itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root);
     }
-    return zex.array(itemSchema).meta(meta) as ZexBase<any>;
+    // eslint-disable-next-line no-console
+    console.log('[fromJsonSchemaInternal] Final itemSchema for array:', itemSchema);
+    const arr = zex.array(itemSchema).meta(meta) as ZexBase<any>;
+    // eslint-disable-next-line no-console
+    console.log('[fromJsonSchemaInternal] Final array schema:', arr);
+    return arr;
   }
   
   if (schema.type === "object") {

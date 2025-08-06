@@ -371,34 +371,43 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
 
   protected _parse(data: unknown, path: PathEntry[]): InferProperty<T[number]> {
     const errors: ZexError[] = [];
-    
     // Try each schema and collect errors
-    for (const schema of this.schemas) {
+    for (let i = 0; i < this.schemas.length; i++) {
+      const schema = this.schemas[i];
       try {
         const unionPath = [...path, {
           type: 'union',
           schema,
           description: (schema as any).config?.meta?.description
         }];
-        return (schema as any)._parse(data, unionPath);
+        const result = (schema as any)._parse(data, unionPath);
+        return result;
       } catch (error) {
         if (error instanceof ZexError) {
           errors.push(error);
         }
       }
     }
-    
-    // Find the most specific error (shortest path = most specific)
+    // Erweiterte Fehlerausgabe: Sammle alle Fehler der Alternativen
+    let message = 'No union variant matched.';
+    if (errors.length > 0) {
+      message += '\nUnion alternative errors:';
+      for (let i = 0; i < errors.length; i++) {
+        const err = errors[i];
+        message += `\n- Alternative ${i}: ${err.message}`;
+      }
+    }
     const bestError = errors.length > 0 
       ? errors.sort((a, b) => a.path.length - b.path.length)[0]
-              : new ZexError(
-            path.map(p => p.key || String(p.index || 'root')),
-            'union_mismatch',
-            `No union variant matched. Got ${typeof data}`,
-            data,
-            'one of the union variants'
-          );
-    
+      : new ZexError(
+          path.map(p => p.key || String(p.index || 'root')),
+          'union_mismatch',
+          `No union variant matched. Got ${typeof data}`,
+          data,
+          'one of the union variants'
+        );
+    // Füge die gesammelte Fehlermeldung als message hinzu
+    bestError.message = message;
     throw bestError;
   }
 }

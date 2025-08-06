@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Union Validation Error Reporting**: Fehlerausgaben bei Union-Validierung wurden deutlich verbessert
+  - Wenn keine Union-Alternative passt, werden jetzt alle Alternativen und deren spezifische Fehler in einer zusammengefassten Fehlermeldung ausgegeben
+  - Erleichtert das Debugging komplexer Schemas und zeigt sofort, warum jede Alternative gescheitert ist
+
+#### Beispiel
+```typescript
+// Vorher: Nur der "spezifischste" Fehler wurde angezeigt
+// Jetzt: Alle Alternativen und deren Fehler werden gelistet
+
+// Beispielausgabe:
+// Error: Field 'messages': No union variant matched.
+// Union alternative errors:
+// - Alternative 0: Field 'role': Expected literal value "system", got "assistant"
+// - Alternative 1: Field 'stopReason': Expected one of [stop, length, ...], got "STOP"
+```
+
 ### Fixed
 - **Improved Error Messages**: Enhanced error messages for invalid JSON Schema objects
   - Fixed misleading error messages that suggested non-existent JSON Schema features
