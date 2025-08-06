@@ -122,6 +122,14 @@ async function runAllTests() {
     console.log("   Array type:", arrayRecordJsonSchema.type);
     console.log("   Has items:", !!arrayRecordJsonSchema.items);
 
+    // Test 9: Union Validation
+    console.log("\n📋 TEST 9: Union Validation");
+    console.log("-".repeat(40));
+    
+    // Import and run union validation test
+    const { runUnionTests } = await import("./union-validation.test.js");
+    await runUnionTests();
+
     console.log("\n" + "=".repeat(60));
     console.log("🎉 ALL TESTS PASSED SUCCESSFULLY!");
     console.log("=".repeat(60));
