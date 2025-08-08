@@ -79,30 +79,39 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this.config.meta;
   }
 
+  // Convenience method to set content media type (MIME type) in meta
+  mimeFormat(mimeType: string): this {
+    const newConfig: ZexConfig = {
+      ...this.config,
+      meta: { ...this.config.meta, contentMediaType: mimeType }
+    };
+    return this.clone(newConfig);
+  }
+
   // Transformation methods with proper Flag-Tracking AND IMMUTABILITY
-  optional(): ZexBase<T, TFlags & { optional: true }> {
+  optional(): this & ZexBase<T, TFlags & { optional: true }> {
     const newConfig: ZexConfig = {
       ...this.config,
       optional: true
     };
-    return this.clone(newConfig) as ZexBase<T, TFlags & { optional: true }>;
+    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { optional: true }>;
   }
 
-  nullable(): ZexBase<T, TFlags & { nullable: true }> {
+  nullable(): this & ZexBase<T, TFlags & { nullable: true }> {
     const newConfig: ZexConfig = {
       ...this.config,
       nullable: true
     };
-    return this.clone(newConfig) as ZexBase<T, TFlags & { nullable: true }>;
+    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { nullable: true }>;
   }
 
-  default(defaultValue: T): ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>> {
+  default(defaultValue: T): this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>> {
     const newConfig: ZexConfig = {
       ...this.config,
       defaultValue,
       optional: false // Default removes optional
     };
-    return this.clone(newConfig) as ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>>;
+    return this.clone(newConfig) as unknown as this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>>;
   }
 
   // Validation methods
@@ -245,6 +254,8 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
         parts.push(entry.index.toString());
       } else if (entry.type === 'union') {
         parts.push('union');
+      } else if (entry.type === 'tuple' && entry.index !== undefined) {
+        parts.push(entry.index.toString());
       }
     }
     return parts.join('.');

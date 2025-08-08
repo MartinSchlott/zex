@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 // - Alternative 1: Field 'stopReason': Expected one of [stop, length, ...], got "STOP"
 ```
 
+## [0.1.11] - 2025-08-08
+### Added
+- **mimeFormat(meta)**: Neue Convenience-Methode `schema.mimeFormat("image/png")` setzt `meta.contentMediaType`.
+
+### Changed
+- **Type Inference Flags**: Korrektur der Typableitung für `optional`/`nullable` von Intersection zu Union (z.B. `T | undefined | null`).
+- **Chaining-UX**: `optional()`, `nullable()`, `default()` bewahren nun den konkreten Subklassen-Typ (besseres Chaining, z.B. `zex.string().optional().min(3)`).
+- **Dokumentation**:
+  - Kein „Drop‑in Replacement“ mehr; Abweichungen dokumentiert (u.a. `object()` standardmäßig strict, `union()` per Varargs, `describe()` statt `description()`).
+  - JSON Schema `$schema` wird nicht automatisch gesetzt; optional via Parameter.
+  - Hinweis zu bewusst unorthodoxem Buffer‑Schema für echte Binärfähigkeit.
+
+### Removed
+- **Debug-Logs**: `console.log`-Ausgaben aus `fromJsonSchemaInternal` entfernt.
+
+### Developer Note
+- ChatGPT‑5 is in town – diese Version wurde mit starker AI‑Assistenz verfeinert (DX, Types, Doku).
+
 ### Fixed
 - **Improved Error Messages**: Enhanced error messages for invalid JSON Schema objects
   - Fixed misleading error messages that suggested non-existent JSON Schema features

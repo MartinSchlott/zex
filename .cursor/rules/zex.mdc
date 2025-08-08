@@ -45,27 +45,14 @@ type User = zex.infer<typeof userSchema>;
 
 **Kein Wrapper-Hell. Keine Generic-Hölle. Nur saubere Types.**
 
-## 🔄 Drop-in Replacement für Zod
+## 🔄 Kompatible API (keine 100% Drop‑in‑Garantie)
 
-Zex ist als **100% kompatibler Zod-Ersatz** gedacht:
+Zex orientiert sich stark an Zod, ist aber **nicht** 100% Drop‑in kompatibel.
 
-```typescript
-// Vorher:
-import { z } from 'zod';
-const schema = z.string().optional();
-
-// Nachher:
-import { zex } from 'zex';  
-const schema = zex.string().optional();
-
-// Gleiche API, bessere Types!
-```
-
-**Alle Zod-Methoden funktionieren identisch:**
-- `zex.string()`, `zex.number()`, `zex.boolean()`
-- `zex.object()`, `zex.array()`, `zex.union()`
-- `.optional()`, `.nullable()`, `.default()`
-- `.email()`, `.min()`, `.max()` usw.
+Wichtige Unterschiede:
+- **`object()` Default-Modus**: Zex nutzt standardmäßig `"strict"` (unbekannte Felder verursachen Fehler). Zod nutzt standardmäßig `strip`.
+- **`union()` Aufruf**: Zex erwartet Varargs (`zex.union(a, b, c)`), Zod erwartet ein Array (`z.union([a, b, c])`).
+- **Beschreibung**: Methode heißt in Zex `describe(...)` (Doku-Beispiele unten entsprechend angepasst).
 
 ## 🏗️ Technische Architektur
 
@@ -103,7 +90,8 @@ interface ZexConfig {
   optional: boolean;
   nullable: boolean;
   validators: Array<Validator>;  // min, max, email, uuid, etc.
-  meta: Record<string, any>;     // Beliebige Metadaten
+  defaultValue?: unknown;
+  meta: Record<string, any>;     // Beliebige Metadaten, u.a. contentMediaType
 }
 ```
 
@@ -114,10 +102,10 @@ Zex bietet **ergonomische Metadata-Methoden** für JSON Schema:
 ```typescript
 const apiSchema = zex.string()
   .title("Username")
-  .description("User's login name")
+  .describe("User's login name")
   .deprecated(true)
   .format("email")
-  .mimeFormat("application/json")
+  .mimeFormat("application/json") // setzt meta.contentMediaType
   .meta({ 
     customField: "value",
     openapi: { example: "john_doe" }
@@ -126,13 +114,14 @@ const apiSchema = zex.string()
 
 **Alle Aufrufe mergen mit dem bestehenden meta-Object:**
 - `.title()` → setzt `meta.title`
-- `.description()` → setzt `meta.description`  
+- `.describe()` → setzt `meta.description`  
+- `.mimeFormat()` → setzt `meta.contentMediaType`
 - `.meta()` → merged beliebige Keys
 - First-class methods für Standard JSON Schema Properties
 
 ## 🌐 JSON Schema Integration
 
-**Direkter Export zu JSON Schema Draft 2020-12:**
+**Export zu JSON Schema (optional Draft 2020-12 via Parameter):**
 
 ```typescript
 const schema = zex.object({
@@ -146,7 +135,7 @@ const jsonSchema = schema.toJsonSchema();
 // Mit Parametern für Feinjustierung:
 const jsonSchema = schema.toJsonSchema({
   additionalProperties: false,
-  $schema: "https://json-schema.org/draft/2020-12/schema"
+  $schema: "https://json-schema.org/draft/2020-12/schema" // optional
 });
 ```
 
@@ -169,6 +158,8 @@ const dataSchema = zex.union(
   zex.number(),
   zex.object({ type: zex.literal("custom") })
 );
+// Hinweis: Zod nutzt hier ein Array: z.union([ ... ])
+// Zex nutzt Varargs: zex.union(a, b, c)
 ```
 
 ## ⚡ Praktisches Beispiel
@@ -186,7 +177,7 @@ const apiSchema = zex.object({
       zex.literal("active"),
       zex.literal("inactive")
     ).default("active")
-  })).description("User data array")
+  })).describe("User data array")
 });
 
 // Clean Type-Inferenz:
@@ -200,14 +191,14 @@ type ApiRequest = zex.infer<typeof apiSchema>;
 //   }>;
 // }
 
-// Runtime-Validation (wie bei Zod):
+// Runtime-Validation (ähnlich zu Zod):
 const result = apiSchema.parse(inputData);
 
 // Bessere Fehlermeldungen:
 // Statt: "Expected ZodString, received ZodNumber"  
 // Zex:   "Field 'data[0].age' expected number, got string"
 
-// JSON Schema Export:
+// JSON Schema Export (ohne default $schema, optional via Parameter):
 const jsonSchema = apiSchema.toJsonSchema({
   title: "API Request Schema",
   additionalProperties: false
@@ -218,12 +209,12 @@ const jsonSchema = apiSchema.toJsonSchema({
 
 | Feature | Zod | Zex |
 |---------|-----|-----|
-| **API** | ✅ Perfekt | ✅ Identisch zu Zod |
+| **API** | ✅ Perfekt | ✅ Sehr ähnlich (kleine Abweichungen, s.o.) |
 | **TypeScript Types** | ❌ Wrapper-Hell | ✅ Saubere Types |
 | **Debugging** | ❌ Unmöglich | ✅ Kristallklar |
 | **Performance** | ⚠️ Wrapper-Overhead | ✅ Optimiert |
-| **JSON Schema** | ❌ 3rd-party | ✅ Built-in 2020-12 |
-| **Migration** | - | ✅ Drop-in Replacement |
+| **JSON Schema** | ❌ 3rd-party | ✅ Built-in (optional Draft 2020-12 via Option) |
+| **Migration** | - | ⚠️ Weitgehend kompatibel (kein Drop‑in), s. Unterschiede |
 | **Metadata** | ⚠️ Begrenzt | ✅ First-class + flexibel |
 | **Unions** | ❌ Generic-Chaos | ✅ Clean Types |
 
@@ -245,3 +236,17 @@ const jsonSchema = apiSchema.toJsonSchema({
 - ✅ **Native JSON Schema Support** für APIs
 
 **Zex = Zod's API + Clean Types + Better DX + JSON Schema**
+
+### Hinweis zu Binärdaten (ZexBuffer)
+
+Zex nutzt für echte Binärfähigkeit ein eigenes JSON‑Schema‑Format für Buffer:
+
+```json
+{
+  "type": "object",
+  "format": "buffer",
+  "contentMediaType": "image/png"
+}
+```
+
+Das ist bewusst unorthodox (statt `string`+`contentEncoding`), um klare Binär‑Semantik zu erhalten. `zex.buffer(mime)` setzt `contentMediaType` automatisch; alternativ kann `.mimeFormat(...)` genutzt werden.

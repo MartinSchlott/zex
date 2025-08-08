@@ -35,7 +35,7 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 ## Quick Start
 
 ```typescript
-import { zex } from 'zex';
+import { zex } from '@ai-inquisitor/zex';
 
 // Basic types
 const userSchema = zex.object({
@@ -98,7 +98,7 @@ const schema = zex.object({
   age: zex.number().int().min(0).max(120)
 });
 
-// Generate JSON Schema
+// Generate JSON Schema (optional $schema)
 const jsonSchema = schema.toJSONSchema({
   $schema: "https://json-schema.org/draft/2020-12/schema"
 });
@@ -138,7 +138,7 @@ const schema = zex.object({
   website: zex.url(),
   avatar: zex.buffer('image/jpeg').optional(),
   
-  // Unions and literals
+  // Unions and literals (Zex uses varargs)
   role: zex.union(
     zex.literal('admin'),
     zex.literal('user'),
@@ -165,7 +165,7 @@ const schema = zex.object({
 - `zex.object(shape)` - Object validation (strict by default)
 - `zex.record(valueSchema)` - Key-value records
 - `zex.tuple([...schemas])` - Fixed-length arrays
-- `zex.union(...schemas)` - One of multiple types
+- `zex.union(...schemas)` - One of multiple types (varargs)
 - `zex.literal(value)` - Exact value matching
 - `zex.enum([...values])` - Enumeration
 
@@ -178,6 +178,7 @@ const schema = zex.object({
 - `.nullable()` - Allow null values
 - `.default(value)` - Set default value
 - `.describe(text)` - Add description for JSON Schema
+- `.mimeFormat(mime)` - Set `contentMediaType` on JSON Schema
 
 ### Object Modes
 - `.strict()` - Reject unknown properties (default)
@@ -186,7 +187,11 @@ const schema = zex.object({
 
 ## Not a Drop-in Replacement
 
-Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes, but the improved type safety and clearer errors make it worth it.
+Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes (e.g., `union(...schemas)` statt `union([schemas])`, strict by default), but the improved type safety and clearer errors make it worth it.
+
+## Version
+
+Current: `0.1.11` (ChatGPT‑5 is in town).
 
 ## Built with AI in One Day
 

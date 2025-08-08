@@ -48,7 +48,7 @@ export interface Validator {
 
 // Path tracking for better error messages
 export type PathEntry = {
-  type: 'root' | 'object' | 'array' | 'union';
+  type: 'root' | 'object' | 'array' | 'union' | 'tuple';
   key?: string;        // For objects: "name", "age"
   index?: number;      // For arrays: 0, 1, 2
   schema: any;         // Reference to the schema (using any to avoid circular dependency)

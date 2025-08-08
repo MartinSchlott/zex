@@ -15,6 +15,14 @@
   "ts-node": {
     "esm": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/tests/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "src/tests",
+    "src/tests_legacy",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 } 
