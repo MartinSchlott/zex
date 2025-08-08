@@ -5,6 +5,8 @@ import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseCon
 
 // Base class for all Zex types with Flag-Tracking
 export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
+  // Type-only brand to carry flag information reliably through intersections
+  declare protected __zexFlags?: TFlags;
   protected config: ZexConfig = {
     optional: false,
     nullable: false,
@@ -89,29 +91,29 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
   }
 
   // Transformation methods with proper Flag-Tracking AND IMMUTABILITY
-  optional(): this & ZexBase<T, TFlags & { optional: true }> {
+  optional(): this & ZexBase<T, TFlags & { optional: true }> & { __zexFlags: TFlags & { optional: true } } {
     const newConfig: ZexConfig = {
       ...this.config,
       optional: true
     };
-    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { optional: true }>;
+    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { optional: true }> & { __zexFlags: TFlags & { optional: true } };
   }
 
-  nullable(): this & ZexBase<T, TFlags & { nullable: true }> {
+  nullable(): this & ZexBase<T, TFlags & { nullable: true }> & { __zexFlags: TFlags & { nullable: true } } {
     const newConfig: ZexConfig = {
       ...this.config,
       nullable: true
     };
-    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { nullable: true }>;
+    return this.clone(newConfig) as unknown as this & ZexBase<T, TFlags & { nullable: true }> & { __zexFlags: TFlags & { nullable: true } };
   }
 
-  default(defaultValue: T): this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>> {
+  default(defaultValue: T): this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>> & { __zexFlags: Omit<TFlags, 'optional'> } {
     const newConfig: ZexConfig = {
       ...this.config,
       defaultValue,
       optional: false // Default removes optional
     };
-    return this.clone(newConfig) as unknown as this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>>;
+    return this.clone(newConfig) as unknown as this & ZexBase<NonNullable<T>, Omit<TFlags, 'optional'>> & { __zexFlags: Omit<TFlags, 'optional'> };
   }
 
   // Validation methods

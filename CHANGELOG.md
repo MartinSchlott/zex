@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 // - Alternative 1: Field 'stopReason': Expected one of [stop, length, ...], got "STOP"
 ```
 
+## [0.1.12] - 2025-08-08
+### Added
+- **parseFromLua UTF-8 Decoding for Strings**: Wenn an einer Stelle ein String erwartet wird, werden jetzt `Uint8Array`, `ArrayBuffer`, Node `Buffer` oder JSON-serialisierte Buffer-Objekte (`{ type: 'Buffer', data: number[] }`) automatisch als UTF‑8 nach JavaScript-String dekodiert.
+
+### Changed
+- **Tests neu strukturiert**: Neue, gruppierte Teststruktur unter `tests/` (unit/complex/special/behavior/jsonschema/integration/regressions) mit Aggregator. Legacy-Tests entfernt.
+
+### Notes
+- Echte Binärfelder mit `zex.buffer(...)` bleiben unverändert und werden nicht dekodiert.
+
 ## [0.1.11] - 2025-08-08
 ### Added
 - **mimeFormat(meta)**: Neue Convenience-Methode `schema.mimeFormat("image/png")` setzt `meta.contentMediaType`.

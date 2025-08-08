@@ -22,3 +22,16 @@ expectFail('type mismatch error', () => zex.number().parse('x' as any));
 const arr = zex.array(zex.string());
 expectOk('lua table to array', () => arr.parseFromLua({ '1': 'a', '2': 'b' } as any));
 
+// lua transform for string decoding from binary
+const strSchema = zex.string();
+const encoder = new TextEncoder();
+const u8 = encoder.encode('hello');
+expectOk('string parses from Uint8Array (utf-8)', () => strSchema.parseFromLua(u8));
+// Node Buffer if available
+if (typeof Buffer !== 'undefined') {
+  const buf = Buffer.from('world', 'utf8');
+  expectOk('string parses from Buffer (utf-8)', () => strSchema.parseFromLua(buf));
+}
+// JSON-serialized Buffer shape
+expectOk('string parses from JSON Buffer object', () => strSchema.parseFromLua({ type: 'Buffer', data: Array.from(u8) } as any));
+

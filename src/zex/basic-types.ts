@@ -25,6 +25,35 @@ export class ZexString<TFlags extends Record<string, boolean> = {}> extends ZexB
   }
 
   protected transformLua(data: unknown): unknown {
+    // Auto-decode binary data to UTF-8 string for Lua/JSON contexts where strings
+    // may be represented as Uint8Array/Buffer. If the schema expects Buffer, that
+    // will be handled by ZexBuffer and not reach here.
+    try {
+      // Uint8Array
+      if (data instanceof Uint8Array) {
+        return new TextDecoder('utf-8', { fatal: false }).decode(data);
+      }
+      // ArrayBuffer
+      if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+        return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(data));
+      }
+      // Node.js Buffer
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
+        const u8 = new Uint8Array(data as unknown as Buffer);
+        return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+      }
+      // JSON-serialized Buffer: { type: 'Buffer', data: number[] }
+      if (typeof data === 'object' && data !== null) {
+        const obj: any = data;
+        if ((obj.type === 'Buffer' || obj._type === 'Buffer') && Array.isArray(obj.data)) {
+          const u8 = Uint8Array.from(obj.data as number[]);
+          return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+        }
+      }
+    } catch {
+      // Fallback: return as-is if decoding fails
+      return data;
+    }
     return data;
   }
 
