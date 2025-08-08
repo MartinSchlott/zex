@@ -7,49 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- **Union Validation Error Reporting**: Fehlerausgaben bei Union-Validierung wurden deutlich verbessert
-  - Wenn keine Union-Alternative passt, werden jetzt alle Alternativen und deren spezifische Fehler in einer zusammengefassten Fehlermeldung ausgegeben
-  - Erleichtert das Debugging komplexer Schemas und zeigt sofort, warum jede Alternative gescheitert ist
+- **Union validation error reporting**: Significantly improved error aggregation when no union alternative matches.
+  - Collects and displays all alternative-specific errors in a single message
+  - Easier debugging of complex schemas with immediate insight why each alternative failed
 
-#### Beispiel
+#### Example
 ```typescript
-// Vorher: Nur der "spezifischste" Fehler wurde angezeigt
-// Jetzt: Alle Alternativen und deren Fehler werden gelistet
+// Before: Only the "most specific" error was shown
+// Now: All alternatives and their errors are listed
 
-// Beispielausgabe:
+// Example output:
 // Error: Field 'messages': No union variant matched.
 // Union alternative errors:
 // - Alternative 0: Field 'role': Expected literal value "system", got "assistant"
 // - Alternative 1: Field 'stopReason': Expected one of [stop, length, ...], got "STOP"
 ```
 
+## [0.1.13] - 2025-08-08
+### Fixed
+- **Optional flag type inference**: A bug caused optional fields (e.g., `uid: zex.string().optional()`) to appear as required in certain intersections. Fixed via internal flag branding (`__zexFlags`) and stabilized return types of `optional/nullable/default`.
+
+### Added
+- **Tests**:
+  - `tests/typecheck/optional-uid.ts`: Type-only (noEmit) verification that optional fields remain optional in inferred types.
+  - `tests/behavior/optional-typing.test.ts`: Runtime test validating parsing without the optional field.
+
+### Note
+- This should have been caught by a simple typecheck test. That's on me — added the missing tests to prevent regressions.
+
 ## [0.1.12] - 2025-08-08
 ### Added
-- **parseFromLua UTF-8 Decoding for Strings**: Wenn an einer Stelle ein String erwartet wird, werden jetzt `Uint8Array`, `ArrayBuffer`, Node `Buffer` oder JSON-serialisierte Buffer-Objekte (`{ type: 'Buffer', data: number[] }`) automatisch als UTF‑8 nach JavaScript-String dekodiert.
+- **parseFromLua UTF‑8 decoding for strings**: When a string is expected, `Uint8Array`, `ArrayBuffer`, Node `Buffer`, or JSON-serialized buffer objects (`{ type: 'Buffer', data: number[] }`) are now automatically decoded to UTF‑8 JavaScript strings.
 
 ### Changed
-- **Tests neu strukturiert**: Neue, gruppierte Teststruktur unter `tests/` (unit/complex/special/behavior/jsonschema/integration/regressions) mit Aggregator. Legacy-Tests entfernt.
+- **Test structure revamped**: New grouped layout under `tests/` (unit/complex/special/behavior/jsonschema/integration/regressions) with aggregator. Legacy tests removed.
 
 ### Notes
-- Echte Binärfelder mit `zex.buffer(...)` bleiben unverändert und werden nicht dekodiert.
+- Real binary fields using `zex.buffer(...)` remain unchanged and are not decoded.
 
 ## [0.1.11] - 2025-08-08
 ### Added
-- **mimeFormat(meta)**: Neue Convenience-Methode `schema.mimeFormat("image/png")` setzt `meta.contentMediaType`.
+- **mimeFormat(meta)**: New convenience method `schema.mimeFormat("image/png")` sets `meta.contentMediaType`.
 
 ### Changed
-- **Type Inference Flags**: Korrektur der Typableitung für `optional`/`nullable` von Intersection zu Union (z.B. `T | undefined | null`).
-- **Chaining-UX**: `optional()`, `nullable()`, `default()` bewahren nun den konkreten Subklassen-Typ (besseres Chaining, z.B. `zex.string().optional().min(3)`).
-- **Dokumentation**:
-  - Kein „Drop‑in Replacement“ mehr; Abweichungen dokumentiert (u.a. `object()` standardmäßig strict, `union()` per Varargs, `describe()` statt `description()`).
-  - JSON Schema `$schema` wird nicht automatisch gesetzt; optional via Parameter.
-  - Hinweis zu bewusst unorthodoxem Buffer‑Schema für echte Binärfähigkeit.
+- **Type inference flags**: Fixed from intersection to union (e.g., `T | undefined | null`).
+- **Chaining DX**: `optional()`, `nullable()`, `default()` now preserve the concrete subclass type (e.g., `zex.string().optional().min(3)`).
+- **Docs**:
+  - No “drop‑in replacement” claim; documented differences (object strict by default, union uses varargs, `describe()` naming).
+  - JSON Schema `$schema` is not set by default; optional via parameter.
+  - Note on intentionally unorthodox buffer JSON Schema for true binary support.
 
 ### Removed
-- **Debug-Logs**: `console.log`-Ausgaben aus `fromJsonSchemaInternal` entfernt.
+- **Debug logs**: Removed `console.log` statements from `fromJsonSchemaInternal`.
 
 ### Developer Note
-- ChatGPT‑5 is in town – diese Version wurde mit starker AI‑Assistenz verfeinert (DX, Types, Doku).
+- ChatGPT‑5 is in town – this release refined with strong AI assistance (DX, types, docs).
 
 ### Fixed
 - **Improved Error Messages**: Enhanced error messages for invalid JSON Schema objects
@@ -69,6 +81,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 // ✅ Before: "Use { type: "any" } for any value" (invalid)
 // ✅ After: "Add 'type' field or use { type: "object", additionalProperties: true } for any value" (valid)
 ```
+
+## [0.1.10] - 2025-01-27
+### Fixed
+- **Union Array Validation**: Fixed a critical bug where arrays with items using `anyOf` (union types) did not validate correctly
+  - Arrays with union item schemas now correctly validate each element against all union alternatives
+  - Prevents false negatives when array elements match a non-first union alternative
+  - Ensures full compatibility with JSON Schema arrays using `anyOf` for items
+
+### Technical Details
+- Patched `fromJsonSchemaInternal` to wrap array `items.anyOf` in a union schema before passing to `zex.array`
+- No side effects or breaking changes; only schema construction logic affected
+
+### Example
+```typescript
+// Before: Only the first anyOf alternative was checked for array items
+// After: All anyOf alternatives are checked for each array element
+
+const schema = {
+  type: "array",
+  items: {
+    anyOf: [
+      { type: "string" },
+      { type: "number" }
+    ]
+  }
+};
+// Now both strings and numbers are accepted in the array
+``` 
 
 ## [0.1.9] - 2025-01-27
 ### Fixed
@@ -374,30 +414,3 @@ const jsonSchema = schema.toJsonSchema();
 - TypeScript configuration
 - Development environment setup 
 
-## [0.1.10] - 2025-01-27
-### Fixed
-- **Union Array Validation**: Fixed a critical bug where arrays with items using `anyOf` (union types) did not validate correctly
-  - Arrays with union item schemas now correctly validate each element against all union alternatives
-  - Prevents false negatives when array elements match a non-first union alternative
-  - Ensures full compatibility with JSON Schema arrays using `anyOf` for items
-
-### Technical Details
-- Patched `fromJsonSchemaInternal` to wrap array `items.anyOf` in a union schema before passing to `zex.array`
-- No side effects or breaking changes; only schema construction logic affected
-
-### Example
-```typescript
-// Before: Only the first anyOf alternative was checked for array items
-// After: All anyOf alternatives are checked for each array element
-
-const schema = {
-  type: "array",
-  items: {
-    anyOf: [
-      { type: "string" },
-      { type: "number" }
-    ]
-  }
-};
-// Now both strings and numbers are accepted in the array
-``` 
