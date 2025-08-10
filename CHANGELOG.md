@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Union validation error reporting**: Significantly improved error aggregation when no union alternative matches.
   - Collects and displays all alternative-specific errors in a single message
   - Easier debugging of complex schemas with immediate insight why each alternative failed
+## [0.1.14] - 2025-08-10
+### Added
+- **Discriminated Unions**: New `zex.discriminatedUnion(discriminator, ...variants)` with clean types and fast runtime dispatch.
+  - Variants must be `zex.object({...})` with required literal at the discriminator key.
+  - Clear errors for missing/invalid discriminator values, variant path tracking preserved.
+  - JSON Schema export as `anyOf` of variants; optional OpenAPI `discriminator` via `.openApiDiscriminator()`.
+  - `fromJsonSchema` detects DU pattern (same required field with `const` across `anyOf`) and reconstructs DU; prefers OpenAPI `discriminator.propertyName` when present.
+
+### Tests
+- Unit tests for DU happy/failure paths and duplicate discriminator construction error.
+- JSON Schema roundtrip tests for DUs.
+- Separate type-error tests under `tests/typecheck-fail/` (not part of default typecheck) to ensure compile-time constraints.
+
 
 #### Example
 ```typescript

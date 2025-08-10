@@ -1,6 +1,6 @@
 {
   "name": "@ai-inquisitor/zex",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,6 +24,8 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
     "test": "NODE_OPTIONS=\"--loader ts-node/esm\" node tests/run-all-tests.ts",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "typecheck:fail": "tsc -p tests/typecheck/tsconfig.fail.json || echo 'expected type errors'",
     "test:basic": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/basic-functionality.test.ts",
     "test:llm": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/llm-schema.test.ts",
     "test:node": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/node-structure.test.ts",

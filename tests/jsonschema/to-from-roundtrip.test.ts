@@ -18,3 +18,13 @@ expectOk('fromJsonSchema parse matches', () => recreated.parse({ name: 'A' }));
 const roundtrip = zex.fromJsonSchema(Schema.toJsonSchema());
 expectOk('roundtrip works with defaults', () => roundtrip.parse({ name: 'B' }));
 
+// Discriminated Union roundtrip
+const DU = zex.discriminatedUnion('kind',
+  zex.object({ kind: zex.literal('a'), a: zex.number() }),
+  zex.object({ kind: zex.literal('b'), b: zex.string() })
+);
+const duSchema = DU.toJsonSchema();
+const duRecreated = zex.fromJsonSchema(duSchema);
+expectOk('roundtrip discriminated union a', () => duRecreated.parse({ kind: 'a', a: 1 }));
+expectOk('roundtrip discriminated union b', () => duRecreated.parse({ kind: 'b', b: 'x' }));
+
