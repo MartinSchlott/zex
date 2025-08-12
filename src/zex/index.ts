@@ -98,9 +98,12 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
   if (schema.description) meta.description = schema.description;
   if (schema.examples) meta.examples = schema.examples;
   if (schema.format) meta.format = schema.format;
+  // Normalize JSON Schema readOnly/writeOnly: drop explicit false
+  if (schema.readOnly === true) meta.readOnly = true;
+  if (schema.writeOnly === true) meta.writeOnly = true;
   // Alle nicht-standardisierten Felder als Meta-Daten übernehmen
   for (const k of Object.keys(schema)) {
-    if (["title","description","examples","format","type","properties","items","required","enum","anyOf","allOf","oneOf","additionalProperties","minLength","maxLength","minimum","maximum","pattern"].indexOf(k) === -1) {
+    if (["title","description","examples","format","type","properties","items","required","enum","anyOf","allOf","oneOf","additionalProperties","minLength","maxLength","minimum","maximum","pattern","readOnly","writeOnly"].indexOf(k) === -1) {
       meta[k] = schema[k];
     }
   }

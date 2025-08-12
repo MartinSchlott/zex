@@ -3,11 +3,12 @@ import { expectOk, expectFail } from '../_utils.js';
 
 console.log("\n=== BEHAVIOR: metadata, defaults/flags, error messages, lua ===");
 
-// metadata + mimeFormat
-const M = zex.string().title('Title').describe('Desc').mimeFormat('text/plain').meta({ custom: 1 });
+// metadata + mimeFormat + readOnly/writeOnly
+const M = zex.string().title('Title').describe('Desc').mimeFormat('text/plain').readOnly().meta({ custom: 1 });
 const schemaForMeta = M.toJsonSchema();
 if ((schemaForMeta as any).description !== 'Desc') throw new Error('description not in json schema');
 if ((schemaForMeta as any).contentMediaType !== 'text/plain') throw new Error('contentMediaType not set by mimeFormat');
+if ((schemaForMeta as any).readOnly !== true) throw new Error('readOnly not exported');
 console.log('✅ metadata merge + mimeFormat reflected in JSON Schema');
 
 // defaults/flags

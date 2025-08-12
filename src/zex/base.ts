@@ -32,6 +32,43 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this.clone(newConfig);
   }
 
+  // JSON Schema annotations for access intent
+  readOnly(flag: boolean = true): this {
+    const newMeta = { ...this.config.meta } as Record<string, unknown>;
+    if (flag) {
+      (newMeta as any).readOnly = true;
+    } else {
+      delete (newMeta as any).readOnly;
+    }
+    const newConfig: ZexConfig = {
+      ...this.config,
+      meta: newMeta
+    };
+    return this.clone(newConfig);
+  }
+
+  writeOnly(flag: boolean = true): this {
+    const newMeta = { ...this.config.meta } as Record<string, unknown>;
+    if (flag) {
+      (newMeta as any).writeOnly = true;
+    } else {
+      delete (newMeta as any).writeOnly;
+    }
+    const newConfig: ZexConfig = {
+      ...this.config,
+      meta: newMeta
+    };
+    return this.clone(newConfig);
+  }
+
+  isReadOnly(): boolean {
+    return this.config.meta.readOnly === true;
+  }
+
+  isWriteOnly(): boolean {
+    return this.config.meta.writeOnly === true;
+  }
+
   describe(description: string): this {
     const newConfig: ZexConfig = {
       ...this.config,

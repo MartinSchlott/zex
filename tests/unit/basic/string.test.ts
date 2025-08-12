@@ -51,6 +51,43 @@ expectOk('fromJsonSchema roundtrip for x-ui-multiline', () => {
   if ((z as any).getMultiline() !== -3.25) throw new Error('roundtrip failed');
 });
 
+// readOnly/writeOnly flags on base
+expectOk('readOnly/writeOnly default false', () => {
+  const s = zex.string();
+  if ((s as any).isReadOnly() !== false) throw new Error('isReadOnly default not false');
+  if ((s as any).isWriteOnly() !== false) throw new Error('isWriteOnly default not false');
+});
+
+expectOk('readOnly() sets, readOnly(false) removes', () => {
+  const s = zex.string().readOnly();
+  if ((s as any).isReadOnly() !== true) throw new Error('isReadOnly not true after set');
+  const json = s.toJsonSchema();
+  if ((json as any).readOnly !== true) throw new Error('readOnly not exported as true');
+  const s2 = s.readOnly(false);
+  if ((s2 as any).isReadOnly() !== false) throw new Error('isReadOnly not false after remove');
+  const json2 = s2.toJsonSchema();
+  if ('readOnly' in (json2 as any)) throw new Error('readOnly key should be absent when false');
+});
+
+expectOk('writeOnly() sets, writeOnly(false) removes', () => {
+  const s = zex.string().writeOnly();
+  if ((s as any).isWriteOnly() !== true) throw new Error('isWriteOnly not true after set');
+  const json = s.toJsonSchema();
+  if ((json as any).writeOnly !== true) throw new Error('writeOnly not exported as true');
+  const s2 = s.writeOnly(false);
+  if ((s2 as any).isWriteOnly() !== false) throw new Error('isWriteOnly not false after remove');
+  const json2 = s2.toJsonSchema();
+  if ('writeOnly' in (json2 as any)) throw new Error('writeOnly key should be absent when false');
+});
+
+expectOk('fromJsonSchema normalizes false for readOnly/writeOnly', () => {
+  const schema = { type: 'string', readOnly: false, writeOnly: false } as any;
+  const z = zex.fromJsonSchema(schema);
+  const json = (z as any).toJsonSchema();
+  if ('readOnly' in (json as any)) throw new Error('readOnly false should be dropped');
+  if ('writeOnly' in (json as any)) throw new Error('writeOnly false should be dropped');
+});
+
 expectFail('multiline rejects NaN', () => {
   zex.string().multiline(Number.NaN as any);
 });
