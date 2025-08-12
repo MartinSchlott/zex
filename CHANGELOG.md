@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Union validation error reporting**: Significantly improved error aggregation when no union alternative matches.
   - Collects and displays all alternative-specific errors in a single message
   - Easier debugging of complex schemas with immediate insight why each alternative failed
+### Added
+- **UI Hints**: `x-ui-multiline` for strings
+  - `zex.string().multiline()` sets `x-ui-multiline` to `1`
+  - `zex.string().multiline(n)` accepts positive, negative and float values
+  - `zex.string().multiline(0)` removes the key (default behaves as `0`)
+  - `getMultiline()` returns the current value or `0` if not set
+  - Non-finite values (`NaN`, `Infinity`, `-Infinity`) throw
+  - Roundtrips via `fromJsonSchema` using the `x-ui-multiline` key
 ## [0.1.14] - 2025-08-10
 ### Added
 - **Discriminated Unions**: New `zex.discriminatedUnion(discriminator, ...variants)` with clean types and fast runtime dispatch.

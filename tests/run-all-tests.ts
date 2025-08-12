@@ -2,35 +2,49 @@
 console.log("\n🚀 Starting Structured zex Test Suite");
 console.log("============================================================\n");
 
+async function runImport(modulePath: string) {
+  try {
+    await import(modulePath);
+    console.log(`Imported: ${modulePath}`);
+  } catch (e) {
+    console.error(`❌ Failed importing ${modulePath}`);
+    console.error(e);
+    process.exit(1);
+  }
+}
+
 // Unit: basic
-await import('./unit/basic/string.test.js');
-await import('./unit/basic/number.test.js');
-await import('./unit/basic/boolean.test.js');
+await runImport('./unit/basic/string.test.ts');
+await runImport('./unit/basic/number.test.ts');
+await runImport('./unit/basic/boolean.test.ts');
 
 // Unit: complex
-await import('./unit/complex/object.test.js');
-await import('./unit/complex/array.test.js');
-await import('./unit/complex/tuple.test.js');
-await import('./unit/complex/record.test.js');
-await import('./unit/complex/union.test.js');
-await import('./unit/complex/literal-enum.test.js');
+await runImport('./unit/complex/object.test.ts');
+await runImport('./unit/complex/array.test.ts');
+await runImport('./unit/complex/tuple.test.ts');
+await runImport('./unit/complex/record.test.ts');
+await runImport('./unit/complex/union.test.ts');
+await runImport('./unit/complex/literal-enum.test.ts');
 
 // Unit: special
-await import('./unit/special/uri-url-buffer-jsonschema.test.js');
+await runImport('./unit/special/uri-url-buffer-jsonschema.test.ts');
 
 // Behavior
-await import('./behavior/type-inference.test.js');
-await import('./behavior/metadata-defaults-errors-lua.test.js');
+await runImport('./behavior/type-inference.test.ts');
+await runImport('./behavior/metadata-defaults-errors-lua.test.ts');
 
 // JSON Schema
-await import('./jsonschema/to-from-roundtrip.test.js');
+await runImport('./jsonschema/to-from-roundtrip.test.ts');
 
 // Integration
-await import('./integration/llm-and-node.test.js');
+await runImport('./integration/llm-and-node.test.ts');
 
 // Regressions
-await import('./regressions/additional-properties-strict-mode.test.js');
+await runImport('./regressions/additional-properties-strict-mode.test.ts');
 
 console.log("\n============================================================");
 console.log("🎉 ALL STRUCTURED TESTS COMPLETED!\n");
+
+// Make this file a module so top-level await is allowed by TS tooling
+export {};
 

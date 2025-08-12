@@ -83,6 +83,34 @@ export class ZexString<TFlags extends Record<string, boolean> = {}> extends ZexB
   pattern(regex: string): ZexString<TFlags> {
     return this.addValidator(new PatternValidator(regex)) as ZexString<TFlags>;
   }
+
+  // UI hint: multiline support
+  multiline(lines?: number): ZexString<TFlags> {
+    // Default: no arg => 1
+    const value = lines === undefined ? 1 : lines;
+
+    // Reject non-finite numbers
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error('multiline() expects a finite number or no argument');
+    }
+
+    // Special case: 0 removes the key
+    if (value === 0) {
+      const meta = { ...this.meta() } as Record<string, unknown>;
+      delete (meta as any)['x-ui-multiline'];
+      return this.meta(meta) as ZexString<TFlags>;
+    }
+
+    // Accept integers and floats (robust), including negatives
+    return this.meta({ 'x-ui-multiline': value }) as ZexString<TFlags>;
+  }
+
+  getMultiline(): number {
+    const meta = this.meta() as Record<string, unknown>;
+    const val = meta['x-ui-multiline'];
+    if (typeof val !== 'number' || !Number.isFinite(val)) return 0;
+    return val;
+  }
 }
 
 // Number implementation
