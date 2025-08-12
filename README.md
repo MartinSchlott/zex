@@ -31,6 +31,9 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **Immutable API**: No wrapper classes, clean fluent interface
 - ✅ **TypeScript-first**: Excellent type inference and IDE support
 - ✅ **Extensible**: Easy to add custom validators and types
+- ✅ **Discriminated Unions**: First-class `discriminatedUnion()` with clean types and JSON Schema export
+- ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
+- ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
 
 ## Quick Start
 
@@ -107,6 +110,10 @@ const jsonSchema = schema.toJSONSchema({
 const recreated = zex.fromJsonSchema(jsonSchema);
 ```
 
+#### UI Hints and Annotations
+- String UI hint `.multiline(n?)` exports to `x-ui-multiline` in JSON Schema; omitted when 0. `getMultiline()` returns the number (default 0).
+- Access annotations `.readOnly()` / `.writeOnly()` export JSON Schema `readOnly: true` / `writeOnly: true`. Passing `false` removes the key. Imported `false` values are normalized (dropped). These flags are documentation-only and do not affect parsing/validation.
+
 ### Clear Error Messages
 ```typescript
 try {
@@ -144,6 +151,11 @@ const schema = zex.object({
     zex.literal('user'),
     zex.literal('guest')
   ),
+  // Discriminated unions
+  pet: zex.discriminatedUnion('type',
+    zex.object({ type: zex.literal('dog'), barks: zex.boolean() }),
+    zex.object({ type: zex.literal('cat'), meows: zex.boolean() })
+  ),
   
   // Enums
   status: zex.enum(['active', 'inactive', 'pending'])
@@ -153,7 +165,7 @@ const schema = zex.object({
 ## API Overview
 
 ### Basic Types
-- `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`
+- `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`
 - `zex.number()` - Number validation with `.int()`, `.min()`, `.max()`
 - `zex.boolean()` - Boolean validation
 - `zex.buffer(mimeType?)` - Binary data validation
@@ -179,6 +191,11 @@ const schema = zex.object({
 - `.default(value)` - Set default value
 - `.describe(text)` - Add description for JSON Schema
 - `.mimeFormat(mime)` - Set `contentMediaType` on JSON Schema
+- `.title(text)` - Set JSON Schema `title`
+- `.format(fmt)` - Set JSON Schema `format`
+- `.deprecated(flag = true)` - Set JSON Schema `deprecated`
+- `.meta(obj)` - Merge arbitrary metadata into JSON Schema
+- `.readOnly(flag = true)` / `.writeOnly(flag = true)` - Set JSON Schema annotations (documentation-only)
 
 ### Object Modes
 - `.strict()` - Reject unknown properties (default)
@@ -191,7 +208,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.1.11` (ChatGPT‑5 is in town).
+Current: `0.1.15`.
 
 ## Built with AI in One Day
 
@@ -213,7 +230,6 @@ It proves that AI-assisted development can create production-ready code incredib
 ## What's Missing
 
 Currently missing some Zod features I didn't need:
-- **Discriminated unions**: Removed from my codebase rather than implement
 - **Refinements**: Custom validation functions (validators system covers this differently)
 - **Transforms**: Data transformation during parsing
 - **Preprocessing**: Input sanitization before validation
