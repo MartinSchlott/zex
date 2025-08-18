@@ -1,7 +1,7 @@
-import { zex } from "./dist/zex/index.js";
+import { zex } from '../_imports.js';
+import { expectOk, expectFail } from '../_utils.js';
 
-console.log("🧪 Testing Complex Union Validation Bug");
-console.log("=======================================");
+console.log("\n=== JSONSCHEMA: complex union bug test ===");
 
 // The complex conversation schema that causes the bug
 const conversationSchema = {
@@ -109,27 +109,38 @@ const conversationData = {
 console.log("📋 Test: Complex conversation validation");
 console.log("Data:", JSON.stringify(conversationData, null, 2));
 
+// Test 1: Convert JSON Schema to zex schema
+let zexSchema: any;
 try {
-  // Convert JSON Schema to zex schema
-  const zexSchema = zex.fromJsonSchema(conversationSchema, { rootName: "Conversation" });
+  zexSchema = zex.fromJsonSchema(conversationSchema, { rootName: "Conversation" });
   console.log("✅ Successfully converted JSON Schema to zex schema");
-  
-  // Validate the data
-  const result = zexSchema.parse(conversationData);
-  console.log("✅ Successfully validated conversation data");
-  console.log("Validated data keys:", Object.keys(result));
-  
+  expectOk('JSON Schema conversion succeeds', () => zexSchema !== undefined);
 } catch (error) {
-  console.log("❌ Error:", error.message);
-  console.log("Error type:", error.constructor.name);
-  
-  // If it's a ZexError, show more details
-  if (error.path) {
-    console.log("Error path:", error.path);
-  }
-  if (error.code) {
-    console.log("Error code:", error.code);
+  console.log("❌ Error during conversion:", error instanceof Error ? error.message : String(error));
+  expectFail('JSON Schema conversion should succeed', () => true);
+}
+
+// Test 2: Validate the data
+if (zexSchema) {
+  try {
+    const result = zexSchema.parse(conversationData);
+    console.log("✅ Successfully validated conversation data");
+    console.log("Validated data keys:", Object.keys(result));
+    expectOk('conversation data validation succeeds', () => result.messages.length === 2);
+  } catch (error) {
+  console.log("❌ Error during validation:", error instanceof Error ? error.message : String(error));
+  console.log("Error type:", error instanceof Error ? error.constructor.name : typeof error);
+    
+    // If it's a ZexError, show more details
+    if (error && typeof error === 'object' && 'path' in error) {
+      console.log("Error path:", (error as any).path);
+    }
+    if (error && typeof error === 'object' && 'code' in error) {
+      console.log("Error code:", (error as any).code);
+    }
+    
+    expectFail('conversation data validation should succeed', () => true);
   }
 }
 
-console.log("\n✅ Complex union validation test completed!"); 
+console.log("\n✅ Complex union validation test completed!");

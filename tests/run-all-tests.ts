@@ -35,6 +35,8 @@ await runImport('./behavior/metadata-defaults-errors-lua.test.ts');
 
 // JSON Schema
 await runImport('./jsonschema/to-from-roundtrip.test.ts');
+await runImport('./jsonschema/enum-jsonschema.test.ts');
+await runImport('./jsonschema/complex-union-bug.test.ts');
 
 // Integration
 await runImport('./integration/llm-and-node.test.ts');
