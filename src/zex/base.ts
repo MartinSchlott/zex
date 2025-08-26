@@ -239,12 +239,13 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     // Basic type validation
     const typeValidation = this.validateType(data);
     if (!typeValidation.success) {
+      const formattedMessage = this.formatValidationError((typeValidation as any).error, path);
       throw new ZexError(
-        path.map(p => p.key || String(p.index)), // Erzeugt ein einfaches string[] für den Pfad
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
         'type_mismatch', 
-        (typeValidation as any).error,
+        formattedMessage,
         data,
-        'expected type from schema' // Hier könnte der erwartete Typ stehen
+        'expected type from schema'
       );
     }
 
@@ -252,10 +253,11 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     for (const validator of this.config.validators) {
       const result = validator.validate(data);
       if (!result.success) {
+        const formattedMessage = this.formatValidationError((result as any).error, path);
         throw new ZexError(
-          path.map(p => p.key || String(p.index)),
+          path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
           'validation_failed',
-          (result as any).error,
+          formattedMessage,
           data,
           'validated by schema constraints'
         );

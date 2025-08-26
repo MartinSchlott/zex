@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.16] - 2025-08-26
+### Changed
+- **Error messages include path/context**: Centralized formatting so failures show where they occurred.
+  - Messages now start with `Validation failed at: <path>` and may include `Context` when available.
+  - Affects type mismatches and validator failures across all types.
+- **Tuple/array path indexing fixed**: Index `0` is no longer dropped from error paths.
+
+### Tests
+- Added behavior test reproducing missing root key vs unknown input key scenario.
+- Adjusted tuple error-path assertion; full suite remains green.
+
 ## [0.1.15] - 2025-08-12
 ### Added
 - **UI Hints**: `x-ui-multiline` for strings

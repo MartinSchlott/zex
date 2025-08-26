@@ -96,7 +96,7 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
     if (!Array.isArray(validatedData)) {
       const dataType = typeof validatedData;
       throw new ZexError(
-        path.map(p => p.key || String(p.index || 'root')),
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
         'type_mismatch',
         `Expected array, got ${dataType}`,
         validatedData,
@@ -223,7 +223,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         if (!shapeKeys.includes(key)) {
           // Throw structured error for unknown properties
           throw new ZexError(
-            path.map(p => p.key || String(p.index || 'root')),
+            path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
             'unknown_property',
             `Unknown property '${key}'`,
             (validatedData as any)[key],
@@ -248,7 +248,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
       } else if (!(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         // Missing required field - throw structured error
         throw new ZexError(
-          path.map(p => p.key || String(p.index || 'root')),
+          path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
           'missing_required_field',
           `Missing required field '${key}'`,
           undefined,
@@ -400,7 +400,7 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
     const bestError = errors.length > 0 
       ? errors.sort((a, b) => a.path.length - b.path.length)[0]
       : new ZexError(
-          path.map(p => p.key || String(p.index || 'root')),
+          path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
           'union_mismatch',
           `No union variant matched. Got ${typeof data}`,
           data,
@@ -507,7 +507,7 @@ export class ZexDiscriminatedUnion<
     if (!schema) {
       const expected = Array.from(this.valueToSchema.keys()).map(v => JSON.stringify(v)).join(' | ');
       throw new ZexError(
-        path.map(p => p.key || String(p.index || 'root')),
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
         'invalid_discriminant',
         `Invalid discriminant value for '${this.discriminatorKey}': ${JSON.stringify(discValue)}. Expected one of: ${expected}`,
         discValue,
@@ -622,7 +622,7 @@ export class ZexTuple<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
           throw error;
         }
         throw new ZexError(
-          path.map(p => p.key || String(p.index || 'root')),
+          path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
           'tuple_element_error',
           `Element at index ${i}: ${error instanceof Error ? error.message : String(error)}`,
           validatedData[i],
