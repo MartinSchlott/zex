@@ -38,3 +38,13 @@ expectOk('OpenAPI discriminator can be added via meta', () => {
   return true;
 });
 
+// Lua transform: prefer string over buffer in union(string, buffer)
+const UStrBuf = zex.union(zex.string(), zex.buffer());
+const enc = new TextEncoder();
+const bytesUtf8 = enc.encode('hello');
+expectOk('union(string, buffer): Uint8Array decodes to string first', () => UStrBuf.parseFromLua(bytesUtf8));
+
+// invalid bytes fallback to buffer
+const invalidBytes = new Uint8Array([0xff, 0xfe, 0xfd]);
+expectOk('union(string, buffer): invalid UTF-8 falls back to buffer', () => UStrBuf.parseFromLua(invalidBytes));
+

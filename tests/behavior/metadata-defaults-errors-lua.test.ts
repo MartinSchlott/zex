@@ -36,3 +36,20 @@ if (typeof Buffer !== 'undefined') {
 // JSON-serialized Buffer shape
 expectOk('string parses from JSON Buffer object', () => strSchema.parseFromLua({ type: 'Buffer', data: Array.from(u8) } as any));
 
+// invalid UTF-8 should fail when targeting string
+const invalid = new Uint8Array([0xff, 0xfe, 0xfd]);
+expectFail('string fails on invalid UTF-8', () => strSchema.parseFromLua(invalid));
+
+// buffer passthrough
+const bufSchema = zex.buffer('application/octet-stream');
+expectOk('buffer accepts Uint8Array unchanged', () => bufSchema.parseFromLua(u8));
+if (typeof ArrayBuffer !== 'undefined') {
+  const ab = u8.buffer.slice(0);
+  expectOk('buffer accepts ArrayBuffer', () => bufSchema.parseFromLua(ab as any));
+}
+if (typeof Buffer !== 'undefined') {
+  const nodeBuf = Buffer.from([1,2,3]);
+  expectOk('buffer accepts Node Buffer', () => bufSchema.parseFromLua(nodeBuf as any));
+}
+expectOk('buffer accepts JSON Buffer shape', () => bufSchema.parseFromLua({ type: 'Buffer', data: [1,2,3] } as any));
+

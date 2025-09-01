@@ -31,28 +31,28 @@ export class ZexString<TFlags extends Record<string, boolean> = {}> extends ZexB
     try {
       // Uint8Array
       if (data instanceof Uint8Array) {
-        return new TextDecoder('utf-8', { fatal: false }).decode(data);
+        return new TextDecoder('utf-8', { fatal: true }).decode(data);
       }
       // ArrayBuffer
       if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
-        return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(data));
+        return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(data));
       }
       // Node.js Buffer
       if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
         const u8 = new Uint8Array(data as unknown as Buffer);
-        return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+        return new TextDecoder('utf-8', { fatal: true }).decode(u8);
       }
       // JSON-serialized Buffer: { type: 'Buffer', data: number[] }
       if (typeof data === 'object' && data !== null) {
         const obj: any = data;
         if ((obj.type === 'Buffer' || obj._type === 'Buffer') && Array.isArray(obj.data)) {
           const u8 = Uint8Array.from(obj.data as number[]);
-          return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+          return new TextDecoder('utf-8', { fatal: true }).decode(u8);
         }
       }
-    } catch {
-      // Fallback: return as-is if decoding fails
-      return data;
+    } catch (err) {
+      // Propagate decoding failure so union logic or caller can decide
+      throw err;
     }
     return data;
   }
@@ -124,6 +124,20 @@ export class ZexNumber<TFlags extends Record<string, boolean> = {}> extends ZexB
   }
 
   protected transformLua(data: unknown): unknown {
+    // Normalize common binary representations to Uint8Array without copying when possible
+    if (data instanceof Uint8Array) return data;
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
+      return new Uint8Array(data as unknown as Buffer);
+    }
+    if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+      return new Uint8Array(data);
+    }
+    if (typeof data === 'object' && data !== null) {
+      const obj: any = data;
+      if ((obj.type === 'Buffer' || obj._type === 'Buffer') && Array.isArray(obj.data)) {
+        return Uint8Array.from(obj.data as number[]);
+      }
+    }
     return data;
   }
 
@@ -284,6 +298,19 @@ export class ZexBuffer<TFlags extends Record<string, boolean> = {}> extends ZexB
     // Accept Buffer (Node.js compatibility)
     if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
       return { success: true };
+    }
+    
+    // Accept ArrayBuffer (normalize upstream in transformLua)
+    if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+      return { success: true };
+    }
+    
+    // Accept JSON-serialized Buffer shape: { type: 'Buffer', data: number[] }
+    if (typeof data === 'object' && data !== null) {
+      const obj: any = data;
+      if ((obj.type === 'Buffer' || obj._type === 'Buffer') && Array.isArray(obj.data)) {
+        return { success: true };
+      }
     }
     
     return { success: false, error: 'Expected binary data (Uint8Array or Buffer)' };

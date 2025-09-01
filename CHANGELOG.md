@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.17] - 2025-09-01
+### Changed
+- Lua parsing: schema-aware handling of Uint8Array/Buffer
+  - `zex.string()` decodes `Uint8Array`/`ArrayBuffer`/`Buffer`/JSON-Buffer-Shape via UTF-8 with `fatal: true` (invalid sequences fail).
+  - `zex.buffer()` accepts binary inputs including `Uint8Array`, `Buffer`, `ArrayBuffer`, and `{ type: 'Buffer', data: number[] }` without copying.
+  - `zex.union(zex.string(), zex.buffer())` tries string first; on UTF-8 failure falls back to buffer.
+
+### Tests
+- Extended behavior tests for Lua string decoding error path and buffer passthrough.
+- Added union tests to verify string-first, buffer-fallback behavior.
+
 ## [0.1.16] - 2025-08-26
 ### Changed
 - **Error messages include path/context**: Centralized formatting so failures show where they occurred.
