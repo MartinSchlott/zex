@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.19] - 2025-09-01
+### Added
+- npm Scripts: `yalc`, `yalc:push` für lokalen Publish/Update‑Flow ohne npm Registry.
+
+### Changed
+- JSON Schema (zex.jsonschema): Rekursive Lua→JSON Normalisierung (1..N‑Tabellen → Arrays) in `transformLua`.
+
+## [0.1.18] - 2025-09-01
+### Changed
+- Lua parsing: `zex.any()` interprets Byte-Sequenzen generell als UTF‑8‑String (fatal bei ungültiger UTF‑8), damit `safeParseFromLua` deterministisch fehl schlägt.
+
 ## [0.1.17] - 2025-09-01
 ### Changed
 - Lua parsing: schema-aware handling of Uint8Array/Buffer

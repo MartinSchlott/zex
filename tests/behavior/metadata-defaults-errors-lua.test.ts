@@ -53,3 +53,36 @@ if (typeof Buffer !== 'undefined') {
 }
 expectOk('buffer accepts JSON Buffer shape', () => bufSchema.parseFromLua({ type: 'Buffer', data: [1,2,3] } as any));
 
+// any: bytes → string (fatal on invalid utf-8)
+const anySchema = zex.any();
+expectOk('any decodes Uint8Array to string', () => anySchema.parseFromLua(u8));
+expectFail('any fails on invalid UTF-8', () => anySchema.parseFromLua(invalid));
+
+// nested: configuration (any) + configSchema (jsonschema)
+const NodeConfig = zex.object({
+  configuration: zex.any().describe('The main configuration settings for this node.'),
+  configSchema: zex.jsonschema().describe('JSON Schema for configuration settings')
+}).passthrough();
+
+const nestedLua = {
+  configuration: {
+    name: 'node',
+    params: { '1': 'a', '2': 'b' }
+  },
+  configSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      params: { type: 'array', items: { type: 'string' } },
+      mode: { enum: { '1': 'a', '2': 'b' } } // enum as lua-like array should normalize to ['a','b'] but here it's object; we don't auto-convert enums, so keep as-is
+    },
+    required: { '1': 'name' },
+    anyOf: {
+      '1': { properties: { name: { type: 'string' } } },
+      '2': { properties: { params: { type: 'array' } } }
+    }
+  }
+};
+
+expectOk('object with any + jsonschema parses from lua (no crash)', () => NodeConfig.parseFromLua(nestedLua));
+

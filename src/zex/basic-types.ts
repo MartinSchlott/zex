@@ -194,7 +194,58 @@ export class ZexAny<TFlags extends Record<string, boolean> = {}> extends ZexBase
   }
 
   protected transformLua(data: unknown): unknown {
-    return data;
+    // Recursively normalize: bytes → UTF-8 JS string (fatal), Lua arrays 1..N → arrays
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const isZeroBasedByteObject = (obj: Record<string, unknown>): Uint8Array | null => {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return null;
+      // all numeric keys 0..N-1
+      if (!keys.every(k => /^\d+$/.test(k))) return null;
+      const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+      for (let i = 0; i < ints.length; i++) if (ints[i] !== i) return null;
+      // values 0..255
+      for (const k of keys) {
+        const v = (obj as any)[k];
+        if (typeof v !== 'number' || v < 0 || v > 255 || !Number.isInteger(v)) return null;
+      }
+      const arr = new Uint8Array(ints.length);
+      for (let i = 0; i < ints.length; i++) arr[i] = (obj as any)[String(i)] as number;
+      return arr;
+    };
+    const normalize = (node: unknown): unknown => {
+      if (node instanceof Uint8Array) return decoder.decode(node);
+      if (typeof ArrayBuffer !== 'undefined' && node instanceof ArrayBuffer) return decoder.decode(new Uint8Array(node));
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(node)) return decoder.decode(new Uint8Array(node as unknown as Buffer));
+      if (Array.isArray(node)) return node.map(normalize);
+      if (node && typeof node === 'object') {
+        const obj = node as Record<string, unknown>;
+        // JSON-serialized Buffer
+        if ((obj as any).type === 'Buffer' && Array.isArray((obj as any).data)) {
+          const u8 = Uint8Array.from(((obj as any).data as number[]));
+          return decoder.decode(u8);
+        }
+        // Zero-based byte object (0..N)
+        const possible = isZeroBasedByteObject(obj);
+        if (possible) return decoder.decode(possible);
+        // Lua array 1..N → array
+        const keys = Object.keys(obj);
+        if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+          const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+          let isOneBasedContiguous = true;
+          for (let i = 0; i < ints.length; i++) if (ints[i] !== i + 1) { isOneBasedContiguous = false; break; }
+          if (isOneBasedContiguous) {
+            const arr: unknown[] = [];
+            for (const n of ints) arr.push(normalize((obj as any)[String(n)]));
+            return arr;
+          }
+        }
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(obj)) out[k] = normalize(v);
+        return out;
+      }
+      return node;
+    };
+    return normalize(data);
   }
 
   // Override validateType to accept anything

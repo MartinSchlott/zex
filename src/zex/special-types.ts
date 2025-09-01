@@ -111,6 +111,67 @@ export class ZexJsonSchema extends ZexBase<JsonSchema> {
   }
 
   protected transformLua(data: unknown): unknown {
-    return data;
+    // Recursively normalize Lua-style arrays and decode byte-like objects into JS strings
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const isZeroBasedByteObject = (obj: Record<string, unknown>): Uint8Array | null => {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return null;
+      if (!keys.every(k => /^\d+$/.test(k))) return null;
+      const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+      for (let i = 0; i < ints.length; i++) if (ints[i] !== i) return null;
+      for (const k of keys) {
+        const v = (obj as any)[k];
+        if (typeof v !== 'number' || v < 0 || v > 255 || !Number.isInteger(v)) return null;
+      }
+      const arr = new Uint8Array(ints.length);
+      for (let i = 0; i < ints.length; i++) arr[i] = (obj as any)[String(i)] as number;
+      return arr;
+    };
+    const normalize = (node: unknown): unknown => {
+      if (node instanceof Uint8Array) return decoder.decode(node);
+      if (typeof ArrayBuffer !== 'undefined' && node instanceof ArrayBuffer) return decoder.decode(new Uint8Array(node));
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(node)) return decoder.decode(new Uint8Array(node as unknown as Buffer));
+      if (Array.isArray(node)) {
+        return node.map(normalize);
+      }
+      if (node && typeof node === 'object') {
+        const obj = node as Record<string, unknown>;
+        // JSON-serialized Buffer
+        if ((obj as any).type === 'Buffer' && Array.isArray((obj as any).data)) {
+          const u8 = Uint8Array.from(((obj as any).data as number[]));
+          return decoder.decode(u8);
+        }
+        // Zero-based byte object → string
+        const possible = isZeroBasedByteObject(obj);
+        if (possible) return decoder.decode(possible);
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return {};
+        // Check for numeric string keys 1..N contiguous
+        const areNumeric = keys.every(k => /^\d+$/.test(k));
+        if (areNumeric) {
+          const sorted = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+          // Ensure contiguous from 1..N
+          let contiguous = true;
+          for (let i = 0; i < sorted.length; i++) {
+            if (sorted[i] !== i + 1) { contiguous = false; break; }
+          }
+          if (contiguous) {
+            const arr: unknown[] = [];
+            for (const n of sorted) {
+              arr.push(normalize((obj as any)[String(n)]));
+            }
+            return arr;
+          }
+        }
+        // Regular object: recurse values
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(obj)) {
+          out[k] = normalize(v);
+        }
+        return out;
+      }
+      return node;
+    };
+    return normalize(data);
   }
 } 

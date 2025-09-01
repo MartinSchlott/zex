@@ -1,6 +1,6 @@
 {
   "name": "@ai-inquisitor/zex",
-  "version": "0.1.17",
+  "version": "0.1.19",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,10 +32,13 @@
     "test:type": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/tests/mytest.ts",
     "start": "node --enable-source-maps dist/index.js",
     "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" node src/index.ts",
-    "publish": "npm publish --access public"
+    "publish": "npm publish --access public",
+    "release": "npm publish --access public",
+    "yalc": "npm run build && yalc publish --no-scripts",
+    "yalc:push": "npm run build && yalc push --no-scripts"
   },
   "keywords": ["schema", "validation", "typescript", "zod", "alternative"],
-  "author": "Your Name",
+  "author": "Martin Schlott",
   "license": "MIT",
   "repository": {
     "type": "git",
