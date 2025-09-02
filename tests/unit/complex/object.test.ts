@@ -24,3 +24,11 @@ expectOk('defaults apply for missing fields', () => zex.object({
 
 expectFail('missing required field', () => zex.object({ n: zex.number() }).parse({} as any));
 
+// function field acceptance
+const ObjWithFn = zex.object({
+  fn: zex.function(),
+  name: zex.string()
+});
+expectOk('object accepts function field', () => ObjWithFn.parse({ fn() {}, name: 'x' }));
+expectFail('object rejects non-function for function field', () => ObjWithFn.parse({ fn: 1 as any, name: 'x' }));
+

@@ -21,3 +21,8 @@ if ((bufJson as any).contentMediaType !== 'image/png') throw new Error('buffer c
 // JsonSchema type (structural only)
 expectOk('jsonschema type is object', () => zex.jsonschema().parse({ type: 'string' } as any));
 
+// function schema export should throw
+expectFail('function jsonschema export throws', () => (zex as any).function().toJsonSchema());
+// tvalue schema export should throw
+expectFail('tvalue jsonschema export throws', () => (zex as any).tvalue().toJsonSchema());
+

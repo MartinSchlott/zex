@@ -3,7 +3,7 @@
 
 import { JsonSchema } from './types.js';
 import { ZexBase } from './base.js';
-import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
+import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue } from './basic-types.js';
 import { ZexArray, ZexObject, ZexRecord, ZexUnion, ZexLiteral, ZexTuple, ZexDiscriminatedUnion } from './complex-types.js';
 import { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
 
@@ -16,6 +16,8 @@ export const zex = {
   any: () => new ZexAny(),
   null: () => new ZexNull(),
   buffer: (mimeType?: string) => new ZexBuffer(mimeType),
+  function: () => new ZexFunction(),
+  tvalue: () => new ZexTValue(),
   enum: <T extends readonly unknown[]>(values: T) => new ZexEnum(values),
 
   // Complex types

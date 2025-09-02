@@ -212,12 +212,19 @@ export class ZexAny<TFlags extends Record<string, boolean> = {}> extends ZexBase
       for (let i = 0; i < ints.length; i++) arr[i] = (obj as any)[String(i)] as number;
       return arr;
     };
+    const visited = new WeakSet<object>();
+    let nodes = 0;
+    const maxNodes = 10000;
     const normalize = (node: unknown): unknown => {
+      nodes++;
+      if (nodes > maxNodes) return node;
       if (node instanceof Uint8Array) return decoder.decode(node);
       if (typeof ArrayBuffer !== 'undefined' && node instanceof ArrayBuffer) return decoder.decode(new Uint8Array(node));
       if (typeof Buffer !== 'undefined' && Buffer.isBuffer(node)) return decoder.decode(new Uint8Array(node as unknown as Buffer));
       if (Array.isArray(node)) return node.map(normalize);
       if (node && typeof node === 'object') {
+        if (visited.has(node as object)) return node;
+        visited.add(node as object);
         const obj = node as Record<string, unknown>;
         // JSON-serialized Buffer
         if ((obj as any).type === 'Buffer' && Array.isArray((obj as any).data)) {
@@ -367,3 +374,47 @@ export class ZexBuffer<TFlags extends Record<string, boolean> = {}> extends ZexB
     return { success: false, error: 'Expected binary data (Uint8Array or Buffer)' };
   }
 } 
+
+// Function implementation (documentation/runtime only, no JSON Schema export)
+export class ZexFunction<TFlags extends Record<string, boolean> = {}> extends ZexBase<Function, TFlags> {
+  protected clone(newConfig: ZexConfig): this {
+    return new ZexFunction(newConfig) as this;
+  }
+
+  protected getBaseJsonSchema(): JsonSchema {
+    // Explicitly disallow exporting functions to JSON Schema
+    throw new Error('zex.function(): JSON Schema export is not supported');
+  }
+
+  protected transformLua(data: unknown): unknown {
+    // Functions are terminal; do not traverse/normalize
+    return data;
+  }
+
+  protected validateType(data: unknown): { success: true } | { success: false; error: string } {
+    if (typeof data !== 'function') {
+      return { success: false, error: 'Expected function' };
+    }
+    return { success: true };
+  }
+}
+
+// TValue: like any, but no transform in Lua context; not exportable to JSON Schema
+export class ZexTValue<TFlags extends Record<string, boolean> = {}> extends ZexBase<any, TFlags> {
+  protected clone(newConfig: ZexConfig): this {
+    return new ZexTValue(newConfig) as this;
+  }
+
+  protected getBaseJsonSchema(): JsonSchema {
+    throw new Error('zex.tvalue(): JSON Schema export is not supported');
+  }
+
+  protected transformLua(data: unknown): unknown {
+    // Do not touch the value for Lua parsing
+    return data;
+  }
+
+  protected validateType(_data: unknown): { success: true } | { success: false; error: string } {
+    return { success: true };
+  }
+}

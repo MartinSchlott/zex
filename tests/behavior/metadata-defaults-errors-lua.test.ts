@@ -86,3 +86,12 @@ const nestedLua = {
 
 expectOk('object with any + jsonschema parses from lua (no crash)', () => NodeConfig.parseFromLua(nestedLua));
 
+// tvalue: no transform pass-through in Lua
+const TV = zex.tvalue();
+const tvPayload = { a: { '1': 'x', '2': 'y' }, b: { '0': 111, '1': 98, '2': 106, '3': 101, '4': 99, '5': 116 } } as any;
+expectOk('tvalue returns input as-is (no transform)', () => {
+  const out = TV.parseFromLua(tvPayload);
+  if (out !== tvPayload) throw new Error('tvalue should not transform');
+  return true;
+});
+

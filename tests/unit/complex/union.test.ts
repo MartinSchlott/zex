@@ -48,3 +48,8 @@ expectOk('union(string, buffer): Uint8Array decodes to string first', () => UStr
 const invalidBytes = new Uint8Array([0xff, 0xfe, 0xfd]);
 expectOk('union(string, buffer): invalid UTF-8 falls back to buffer', () => UStrBuf.parseFromLua(invalidBytes));
 
+// union with function
+const UFn = zex.union(zex.function(), zex.string());
+expectOk('union(function, string) accepts function', () => UFn.parse(function() {}));
+expectOk('union(function, string) accepts string', () => UFn.parse('x'));
+

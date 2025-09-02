@@ -9,16 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
-## [0.1.19] - 2025-09-01
+## [0.1.21] - 2025-09-01
 ### Added
-- npm Scripts: `yalc`, `yalc:push` für lokalen Publish/Update‑Flow ohne npm Registry.
+- zex.tvalue(): "any, no transform" for Lua context. No Lua transformation, no JSON Schema export/import support (export throws).
+
+## [0.1.20] - 2025-09-01
+### Added
+- zex.function(): accepts functions (parse/parseFromLua), not exported to JSON Schema (export throws).
 
 ### Changed
-- JSON Schema (zex.jsonschema): Rekursive Lua→JSON Normalisierung (1..N‑Tabellen → Arrays) in `transformLua`.
+- Lua Parsing Guards: `zex.any()` and `zex.jsonschema()` now have cycle protection (WeakSet) and node limit to safely process recursive structures.
+
+## [0.1.19] - 2025-09-01
+### Added
+- npm Scripts: `yalc`, `yalc:push` for local publish/update flow without npm registry.
+
+### Changed
+- JSON Schema (zex.jsonschema): Recursive Lua→JSON normalization (1..N tables → arrays) in `transformLua`.
 
 ## [0.1.18] - 2025-09-01
 ### Changed
-- Lua parsing: `zex.any()` interprets Byte-Sequenzen generell als UTF‑8‑String (fatal bei ungültiger UTF‑8), damit `safeParseFromLua` deterministisch fehl schlägt.
+- Lua parsing: `zex.any()` interprets byte sequences generally as UTF-8 string (fatal on invalid UTF-8) so `safeParseFromLua` fails deterministically.
 
 ## [0.1.17] - 2025-09-01
 ### Changed

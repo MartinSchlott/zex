@@ -127,7 +127,12 @@ export class ZexJsonSchema extends ZexBase<JsonSchema> {
       for (let i = 0; i < ints.length; i++) arr[i] = (obj as any)[String(i)] as number;
       return arr;
     };
+    const visited = new WeakSet<object>();
+    let nodes = 0;
+    const maxNodes = 10000;
     const normalize = (node: unknown): unknown => {
+      nodes++;
+      if (nodes > maxNodes) return node;
       if (node instanceof Uint8Array) return decoder.decode(node);
       if (typeof ArrayBuffer !== 'undefined' && node instanceof ArrayBuffer) return decoder.decode(new Uint8Array(node));
       if (typeof Buffer !== 'undefined' && Buffer.isBuffer(node)) return decoder.decode(new Uint8Array(node as unknown as Buffer));
@@ -135,6 +140,8 @@ export class ZexJsonSchema extends ZexBase<JsonSchema> {
         return node.map(normalize);
       }
       if (node && typeof node === 'object') {
+        if (visited.has(node as object)) return node;
+        visited.add(node as object);
         const obj = node as Record<string, unknown>;
         // JSON-serialized Buffer
         if ((obj as any).type === 'Buffer' && Array.isArray((obj as any).data)) {
