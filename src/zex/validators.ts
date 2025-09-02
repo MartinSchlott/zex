@@ -144,6 +144,70 @@ export class IntValidator implements Validator {
   }
 }
 
+export class PositiveValidator implements Validator {
+  validate(value: unknown): ValidationResult {
+    if (typeof value !== 'number') {
+      return { success: false, error: 'Expected number' };
+    }
+    if (!(value > 0)) {
+      return { success: false, error: 'Number must be greater than 0' };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { exclusiveMinimum: 0 as unknown as number } as any;
+  }
+}
+
+export class NonNegativeValidator implements Validator {
+  validate(value: unknown): ValidationResult {
+    if (typeof value !== 'number') {
+      return { success: false, error: 'Expected number' };
+    }
+    if (value < 0) {
+      return { success: false, error: 'Number must be at least 0' };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { minimum: 0 };
+  }
+}
+
+export class NegativeValidator implements Validator {
+  validate(value: unknown): ValidationResult {
+    if (typeof value !== 'number') {
+      return { success: false, error: 'Expected number' };
+    }
+    if (!(value < 0)) {
+      return { success: false, error: 'Number must be less than 0' };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { exclusiveMaximum: 0 as unknown as number } as any;
+  }
+}
+
+export class NonPositiveValidator implements Validator {
+  validate(value: unknown): ValidationResult {
+    if (typeof value !== 'number') {
+      return { success: false, error: 'Expected number' };
+    }
+    if (value > 0) {
+      return { success: false, error: 'Number must be at most 0' };
+    }
+    return { success: true, data: value };
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    return { maximum: 0 };
+  }
+}
+
 export class ArrayMinLengthValidator implements Validator {
   constructor(private minLength: number) {}
 

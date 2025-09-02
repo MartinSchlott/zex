@@ -110,6 +110,13 @@ const jsonSchema = schema.toJSONSchema({
 const recreated = zex.fromJsonSchema(jsonSchema);
 ```
 
+- Import mapping for number bounds:
+  - `exclusiveMinimum === 0` → `.positive()`
+  - `minimum === 0` → `.nonnegative()`
+  - `exclusiveMaximum === 0` → `.negative()`
+  - `maximum === 0` → `.nonpositive()`
+- Export includes all constraints without deduplication; when multiple bounds exist, the tighter bound prevails at runtime.
+
 #### UI Hints and Annotations
 - String UI hint `.multiline(n?)` exports to `x-ui-multiline` in JSON Schema; omitted when 0. `getMultiline()` returns the number (default 0).
 - Access annotations `.readOnly()` / `.writeOnly()` export JSON Schema `readOnly: true` / `writeOnly: true`. Passing `false` removes the key. Imported `false` values are normalized (dropped). These flags are documentation-only and do not affect parsing/validation.
@@ -166,7 +173,7 @@ const schema = zex.object({
 
 ### Basic Types
 - `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`
-- `zex.number()` - Number validation with `.int()`, `.min()`, `.max()`
+- `zex.number()` - Number validation (finite-only) with `.int()`, `.min()`, `.max()`, `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
 - `zex.boolean()` - Boolean validation
 - `zex.buffer(mimeType?)` - Binary data validation
 - `zex.any()` - Any value (use sparingly)
@@ -196,6 +203,12 @@ const schema = zex.object({
 - `.deprecated(flag = true)` - Set JSON Schema `deprecated`
 - `.meta(obj)` - Merge arbitrary metadata into JSON Schema
 - `.readOnly(flag = true)` / `.writeOnly(flag = true)` - Set JSON Schema annotations (documentation-only)
+- `.positive()` - Number must be greater than 0 (JSON Schema: `exclusiveMinimum: 0`)
+- `.nonnegative()` - Number must be at least 0 (JSON Schema: `minimum: 0`)
+- `.negative()` - Number must be less than 0 (JSON Schema: `exclusiveMaximum: 0`)
+- `.nonpositive()` - Number must be at most 0 (JSON Schema: `maximum: 0`)
+
+Note: `zex.number()` is finite-only; it rejects `NaN`, `Infinity`, and `-Infinity`.
 
 ### Object Modes
 - `.strict()` - Reject unknown properties (default)
@@ -208,7 +221,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.1.21`.
+Current: `0.1.22`.
 
 ## Built with AI in One Day
 

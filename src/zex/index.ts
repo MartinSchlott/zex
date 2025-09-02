@@ -157,6 +157,18 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (schema.maximum !== undefined) {
       numberSchema = numberSchema.max(schema.maximum);
     }
+    if (schema.exclusiveMinimum === 0) {
+      numberSchema = (numberSchema as any).positive();
+    }
+    if (schema.minimum === 0) {
+      numberSchema = (numberSchema as any).nonnegative();
+    }
+    if (schema.exclusiveMaximum === 0) {
+      numberSchema = (numberSchema as any).negative();
+    }
+    if (schema.maximum === 0) {
+      numberSchema = (numberSchema as any).nonpositive();
+    }
     if (schema.type === 'integer') {
       numberSchema = numberSchema.int();
     }

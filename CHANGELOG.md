@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.22] - 2025-09-02
+### Added
+- Number modifiers: `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
+  - JSON Schema export: `exclusiveMinimum: 0`, `minimum: 0`, `exclusiveMaximum: 0`, `maximum: 0` respectively
+  - JSON Schema import mapping added for these bounds at 0
+
+### Changed
+- `zex.number()` now enforces finite values; rejects `NaN`, `Infinity`, and `-Infinity`
+- JSON Schema export includes all constraints without deduplication (the tighter bound applies at runtime)
+
 ## [0.1.21] - 2025-09-01
 ### Added
 - zex.tvalue(): "any, no transform" for Lua context. No Lua transformation, no JSON Schema export/import support (export throws).

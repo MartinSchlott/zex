@@ -11,7 +11,11 @@ import {
   PatternValidator,
   MinValidator,
   MaxValidator,
-  IntValidator
+  IntValidator,
+  PositiveValidator,
+  NonNegativeValidator,
+  NegativeValidator,
+  NonPositiveValidator
 } from './validators.js';
 
 // String implementation
@@ -145,6 +149,9 @@ export class ZexNumber<TFlags extends Record<string, boolean> = {}> extends ZexB
     if (typeof data !== 'number') {
       return { success: false, error: 'Expected number' };
     }
+    if (!Number.isFinite(data)) {
+      return { success: false, error: 'Expected finite number' };
+    }
     return { success: true };
   }
 
@@ -158,6 +165,22 @@ export class ZexNumber<TFlags extends Record<string, boolean> = {}> extends ZexB
 
   int(): ZexNumber<TFlags> {
     return this.addValidator(new IntValidator()) as ZexNumber<TFlags>;
+  }
+
+  positive(): ZexNumber<TFlags> {
+    return this.addValidator(new PositiveValidator()) as ZexNumber<TFlags>;
+  }
+
+  nonnegative(): ZexNumber<TFlags> {
+    return this.addValidator(new NonNegativeValidator()) as ZexNumber<TFlags>;
+  }
+
+  negative(): ZexNumber<TFlags> {
+    return this.addValidator(new NegativeValidator()) as ZexNumber<TFlags>;
+  }
+
+  nonpositive(): ZexNumber<TFlags> {
+    return this.addValidator(new NonPositiveValidator()) as ZexNumber<TFlags>;
   }
 }
 
