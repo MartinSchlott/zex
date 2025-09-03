@@ -41,6 +41,7 @@ await runImport('./jsonschema/to-from-roundtrip.test.ts');
 await runImport('./jsonschema/enum-jsonschema.test.ts');
 await runImport('./jsonschema/complex-union-bug.test.ts');
 await runImport('./jsonschema/additional-properties-export.test.ts');
+await runImport('./jsonschema/any-empty-and-true-acceptance.test.ts');
 
 // Integration
 await runImport('./integration/llm-and-node.test.ts');

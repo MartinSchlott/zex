@@ -1,6 +1,6 @@
 {
   "name": "@ai-inquisitor/zex",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,7 +37,13 @@
     "yalc": "npm run build && yalc publish --no-scripts",
     "yalc:push": "npm run build && yalc push --no-scripts"
   },
-  "keywords": ["schema", "validation", "typescript", "zod", "alternative"],
+  "keywords": [
+    "schema",
+    "validation",
+    "typescript",
+    "zod",
+    "alternative"
+  ],
   "author": "Martin Schlott",
   "license": "MIT",
   "repository": {

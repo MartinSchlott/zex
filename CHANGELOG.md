@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.24] - 2025-09-03
+### Changed
+- JSON Schema import: accept "any" via `{}` and boolean `true` consistently
+  - `fromJsonSchema({})` now maps to `zex.any()` (preserves meta like `title`/`description`)
+  - `fromJsonSchema(true)` now maps to `zex.any()`
+  - Array `items: true` is treated as `any`
+  - Meta-only object schemas (no structural keys) are treated as `any` while keeping meta
+  - Keeps export behavior: `toJSONSchema(zex.any())` continues to emit `{}`
+
+### Tests
+- Added `tests/jsonschema/any-empty-and-true-acceptance.test.ts`
+  - Flat cases for `{}` and `true`
+  - Nested cases for `properties`, `items`, and `additionalProperties`
+  - Practical cases using `safeFromJsonSchema(true)` and `fromJsonSchema({})` with parse
+
 ## [0.1.23] - 2025-09-02
 ### Changed
 - Object parsing: Treat present-but-undefined fields like missing

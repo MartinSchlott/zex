@@ -87,6 +87,10 @@ function buildPathString(path: (string | number)[], root?: string): string {
 }
 
 function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
+  // Support boolean schemas: true means "accept anything"
+  if (schema === true) {
+    return zex.any();
+  }
   if (!schema || typeof schema !== "object") {
     const pathString = buildPathString(path, root);
     const schemaType = typeof schema;
@@ -198,6 +202,9 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     let itemSchema: ZexBase<any>;
     if (schema.items && Array.isArray(schema.items.anyOf)) {
       itemSchema = zex.union(...schema.items.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)));
+    } else if (schema.items === true) {
+      // Boolean true items means any
+      itemSchema = zex.any();
     } else if (typeof schema.items === 'object' && Object.keys(schema.items).length === 0) {
       // Empty items object means any type
       itemSchema = zex.any();
@@ -330,9 +337,9 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
   // Provide more specific error messages for common issues
   const pathString = buildPathString(path, root);
   
-  // Check for empty object (missing type)
+  // Check for empty object (missing type) → interpret as "any"
   if (typeof schema === 'object' && schema !== null && Object.keys(schema).length === 0) {
-    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
+    return zex.any().meta(meta) as ZexBase<any>;
   }
   
   // Check for null schema
@@ -340,14 +347,20 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - null is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
   }
   
-  // Check for schema without type
+  // Check for schema without type. If it only carries meta (e.g., title/description/format/readOnly/writeOnly/unknown ext keys),
+  // treat it as "any" and preserve meta. Otherwise, error out.
   if (typeof schema === 'object' && schema !== null && !schema.type && !schema.enum && !schema.anyOf && !schema.allOf && !schema.oneOf && !schema.const && !schema.$ref) {
     const keys = Object.keys(schema);
-    if (keys.length > 0) {
-      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "object", additionalProperties: true } for any value.`);
-    } else {
-      throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - empty object {} is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
+    const structuralKeys = [
+      'type','properties','items','required','enum','anyOf','allOf','oneOf','additionalProperties',
+      'minLength','maxLength','minimum','maximum','pattern','const','$ref'
+    ];
+    const nonMetaPresent = keys.some(k => structuralKeys.includes(k));
+    if (!nonMetaPresent) {
+      // Meta-only schema → interpret as any with meta
+      return zex.any().meta(meta) as ZexBase<any>;
     }
+    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "object", additionalProperties: true } for any value.`);
   }
   
   throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${pathString}'`);
