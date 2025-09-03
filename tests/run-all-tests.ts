@@ -44,6 +44,7 @@ await runImport('./jsonschema/additional-properties-export.test.ts');
 
 // Integration
 await runImport('./integration/llm-and-node.test.ts');
+await runImport('./integration/supabase-config.test.ts');
 
 // Regressions
 await runImport('./regressions/additional-properties-strict-mode.test.ts');

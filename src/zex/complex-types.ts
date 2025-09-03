@@ -193,8 +193,21 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
     // Validate each field
     for (const [key, schema] of Object.entries(this.shape)) {
       if (key in data) {
-        // Always validate if field is present, regardless of whether it's optional
-        const result = (schema as any).safeParse((data as any)[key]);
+        const value = (data as any)[key];
+        // Treat explicit undefined as missing: allow optional or default, else error
+        if (value === undefined) {
+          if ((schema as any).config?.defaultValue !== undefined) {
+            // default will apply in _parse
+            continue;
+          }
+          if ((schema as any).config?.optional) {
+            // optional undefined is fine
+            continue;
+          }
+          return { success: false, error: `Missing required field '${key}'` };
+        }
+        // Always validate if field is present with a concrete value
+        const result = (schema as any).safeParse(value);
         if (!result.success) {
           return { success: false, error: `Field '${key}': ${result.error}` };
         }
@@ -244,7 +257,27 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
           schema,
           description: (schema as any).config?.meta?.description
         }];
-        result[key] = (schema as any)._parse((validatedData as any)[key], fieldPath);
+        const value = (validatedData as any)[key];
+        if (value === undefined) {
+          if ((schema as any).config?.optional) {
+            result[key] = undefined;
+            continue;
+          }
+          if ((schema as any).config?.defaultValue !== undefined) {
+            // Trigger default by parsing undefined
+            result[key] = (schema as any)._parse(undefined, fieldPath);
+            continue;
+          }
+          // Required without default: error
+          throw new ZexError(
+            path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
+            'missing_required_field',
+            `Missing required field '${key}'`,
+            undefined,
+            'required field from schema'
+          );
+        }
+        result[key] = (schema as any)._parse(value, fieldPath);
       } else if (!(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         // Missing required field - throw structured error
         throw new ZexError(

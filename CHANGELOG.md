@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.23] - 2025-09-02
+### Changed
+- Object parsing: Treat present-but-undefined fields like missing
+  - If field has a default, default applies
+  - If field is optional, undefined is accepted without inner validation
+  - If field is required and has no default, error as missing
+- Rationale: Aligns server/client flows where clients may include `undefined` properties after merges/forms; prevents spurious validation errors (e.g., optional arrays as `undefined`).
+
 ## [0.1.22] - 2025-09-02
 ### Added
 - Number modifiers: `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
