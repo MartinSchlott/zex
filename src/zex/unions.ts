@@ -225,17 +225,15 @@ export class ZexDiscriminatedUnion<
   protected _parse(data: unknown, path: PathEntry[]): any {
     const validatedData = super._parse(data, path) as Record<string, unknown>;
 
-    // Normalize discriminator again at parse time to be robust even if called directly without parseFromLua
-    const original = (validatedData as any)[this.discriminatorKey];
-    const normalized = decodePossibleUtf8Bytes(original);
-    const schema = this.valueToSchema.get(normalized);
+    const discValue = (validatedData as any)[this.discriminatorKey];
+    const schema = this.valueToSchema.get(discValue);
     if (!schema) {
       const expected = Array.from(this.valueToSchema.keys()).map(v => JSON.stringify(v)).join(' | ');
       throw new ZexError(
         path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
         'invalid_discriminant',
-        `Invalid discriminant value for '${this.discriminatorKey}': ${JSON.stringify(original)}. Expected one of: ${expected}`,
-        original,
+        `Invalid discriminant value for '${this.discriminatorKey}': ${JSON.stringify(discValue)}. Expected one of: ${expected}`,
+        discValue,
         expected
       );
     }
@@ -245,8 +243,7 @@ export class ZexDiscriminatedUnion<
       schema,
       description: (schema as any).config?.meta?.description
     }];
-    const patched = { ...validatedData, [this.discriminatorKey]: normalized };
-    return (schema as any)._parse(patched, unionPath);
+    return (schema as any)._parse(validatedData, unionPath);
   }
 }
 
