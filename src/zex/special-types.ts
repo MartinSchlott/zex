@@ -76,21 +76,41 @@ export class ZexUrl extends ZexString {
       return baseValidation;
     }
 
-    // URL Pattern: http://domain/path?query or https://domain/path?query
-    // Practical: allows http:// and https:// with query parameters
-    const urlPattern = /^https?:\/\/[^\s]+$/i;
-    if (!urlPattern.test(data as string)) {
-      return { success: false, error: 'Invalid URL format. Expected http:// or https:// followed by domain and path' };
+    const urlString = data as string;
+
+    // Comprehensive URL Pattern: https://domain:port/path?query#fragment
+    // Allows http:// and https:// with optional port, path, query, and fragment
+    const urlPattern = /^https?:\/\/(?:[-\w.])+(?::[0-9]+)?(?:\/(?:[\w\/_.-])*)?(?:\?(?:[\w&=%.~!$'()*+,;:@\/-])*)?(?:#(?:[\w.~!$'()*+,;:@\/-])*)?$/i;
+    
+    if (!urlPattern.test(urlString)) {
+      return { success: false, error: 'Invalid URL format. Expected http:// or https:// followed by valid domain and optional path/query/fragment' };
     }
 
-    // Additional validation: ensure proper domain format
-    try {
-      const url = new URL(data as string);
-      if (!url.hostname || url.hostname.includes('..') || url.hostname.startsWith('.') || url.hostname.endsWith('.')) {
-        return { success: false, error: 'Invalid URL format. Invalid domain name' };
+    // Extract and validate hostname part
+    const hostnameMatch = urlString.match(/^https?:\/\/([^\/\s:]+)/i);
+    if (!hostnameMatch) {
+      return { success: false, error: 'Invalid URL format. Missing or invalid hostname' };
+    }
+
+    const hostname = hostnameMatch[1];
+    
+    // Validate hostname: no consecutive dots, no leading/trailing dots
+    if (hostname.includes('..') || hostname.startsWith('.') || hostname.endsWith('.')) {
+      return { success: false, error: 'Invalid URL format. Invalid domain name' };
+    }
+
+    // Validate hostname contains at least one dot (for domain) or is localhost
+    if (!hostname.includes('.') && hostname !== 'localhost') {
+      return { success: false, error: 'Invalid URL format. Domain must contain a dot or be localhost' };
+    }
+
+    // Validate port if present
+    const portMatch = urlString.match(/^https?:\/\/[^\/\s:]+:([0-9]+)/i);
+    if (portMatch) {
+      const port = parseInt(portMatch[1], 10);
+      if (port < 1 || port > 65535) {
+        return { success: false, error: 'Invalid URL format. Port must be between 1 and 65535' };
       }
-    } catch {
-      return { success: false, error: 'Invalid URL format. Malformed URL structure' };
     }
 
     return { success: true };

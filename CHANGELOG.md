@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.25] - 2025-01-27
+### Fixed
+- **URL Validator**: Replaced `new URL()` browser API with pure regex-based validation
+  - Removes dependency on browser-specific `URL` constructor
+  - Works consistently across Node.js, browsers, and other JavaScript environments
+  - Enhanced validation with comprehensive regex patterns for all URL components
+  - Better error messages for different validation failures (hostname, port, domain format)
+  - Maintains full compatibility with existing URL validation behavior
+
+### Technical Details
+- Replaced `new URL(data as string)` with regex-based hostname and port validation
+- Added comprehensive URL pattern matching for protocol, domain, port, path, query, and fragment
+- Enhanced hostname validation (no consecutive dots, proper domain format)
+- Port validation (1-65535 range) without external APIs
+- Improved error messages for better debugging experience
+
 ## [0.1.24] - 2025-09-03
 ### Changed
 - JSON Schema import: accept "any" via `{}` and boolean `true` consistently
