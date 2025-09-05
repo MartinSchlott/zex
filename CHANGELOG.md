@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.1.26] - 2025-09-04
+### Fixed
+- **Lua parseFromLua for unions/DU**: Decode Lua byte-strings for literals and DU discriminators
+  - `ZexLiteral.transformLua` now decodes `Uint8Array`/Buffer/zero-based byte objects to UTF‑8 when the literal expects a string
+  - `ZexDiscriminatedUnion` normalizes the discriminator value in Lua context before variant dispatch
+  - Behavior tests added for nested `messages[]` with `role` as bytes (both zero-based objects and `Uint8Array`)
+
+### Refactor
+- Extracted union classes to `src/zex/unions.ts` and restored `.openApiDiscriminator()` helper
+- Moved `ZexLiteral` to `src/zex/literal.ts`
+- Added shared byte→string helper `decodePossibleUtf8Bytes` in `src/zex/utils/lua.ts`
+- Reduced `complex-types.ts` size for readability
+
 ## [0.1.25] - 2025-01-27
 ### Fixed
 - **URL Validator**: Replaced `new URL()` browser API with pure regex-based validation

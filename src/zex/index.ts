@@ -4,7 +4,8 @@
 import { JsonSchema } from './types.js';
 import { ZexBase } from './base.js';
 import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue } from './basic-types.js';
-import { ZexArray, ZexObject, ZexRecord, ZexLiteral, ZexTuple } from './complex-types.js';
+import { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types.js';
+import { ZexLiteral } from './literal.js';
 import { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
 import { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
 
@@ -393,7 +394,8 @@ export { ZexError } from './types.js';
 // Re-export classes for external use (as values and types)
 export { ZexBase } from './base.js';
 export { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
-export { ZexArray, ZexObject, ZexRecord, ZexLiteral, ZexTuple } from './complex-types.js';
+export { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types.js';
+export { ZexLiteral } from './literal.js';
 export { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
 export { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
 
