@@ -35,6 +35,7 @@ await runImport('./behavior/type-inference.test.ts');
 await runImport('./behavior/metadata-defaults-errors-lua.test.ts');
 await runImport('./behavior/repro-missing-root-key-vs-input.test.ts');
 await runImport('./behavior/lua-deep-any-jsonschema-failing.test.ts');
+await runImport('./behavior/lua-union-literal-discriminant-bytes.test.ts');
 
 // JSON Schema
 await runImport('./jsonschema/to-from-roundtrip.test.ts');
