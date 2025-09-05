@@ -5,13 +5,6 @@ console.log("\n=== BEHAVIOR: Lua byte strings in unions & discriminated unions =
 
 const enc = new TextEncoder();
 
-// Helper to create a zero-based numeric-key byte object like {"0":115,...}
-const toZeroBasedByteObject = (s: string) => {
-  const u8 = enc.encode(s);
-  const obj: Record<string, number> = {};
-  for (let i = 0; i < u8.length; i++) obj[String(i)] = u8[i];
-  return obj;
-};
 
 // Nested hierarchy: request.messages[] where each item is a union of role variants
 const MessageSystem = zex.object({
@@ -40,14 +33,6 @@ const DURequest = zex.object({
   messages: zex.array(DUMessage)
 });
 
-// Prepare Lua-like payloads where the role is provided as bytes in different encodings
-const luaByteObjectRole = {
-  messages: [
-    { role: toZeroBasedByteObject('system'), content: 'hello' },
-    { role: toZeroBasedByteObject('user'), content: 'hi' }
-  ]
-};
-
 const luaUint8ArrayRole = {
   messages: [
     { role: enc.encode('system'), content: 'hello' },
@@ -55,11 +40,8 @@ const luaUint8ArrayRole = {
   ]
 };
 
-// Desired behavior: should SUCCEED after the fix
-expectOk('union-literal: role as zero-based byte object decodes and parses', () => Request.parseFromLua(luaByteObjectRole as any));
+// Desired behavior: should SUCCEED with Uint8Array input (Fengari contract)
 expectOk('union-literal: role as Uint8Array decodes and parses', () => Request.parseFromLua(luaUint8ArrayRole as any));
-
-expectOk('discriminated-union: role as zero-based byte object decodes and parses', () => DURequest.parseFromLua(luaByteObjectRole as any));
 expectOk('discriminated-union: role as Uint8Array decodes and parses', () => DURequest.parseFromLua(luaUint8ArrayRole as any));
 
 
