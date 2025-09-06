@@ -157,7 +157,12 @@ export class ZexDiscriminatedUnion<
   }
 
   protected getBaseJsonSchema(): JsonSchema {
-    return { anyOf: this.variants.map(schema => schema.toJsonSchema()) } as any;
+    return { 
+      anyOf: this.variants.map(schema => schema.toJsonSchema()),
+      discriminator: {
+        propertyName: this.discriminatorKey
+      }
+    };
   }
 
   // Normalize discriminator before delegating transform to the matched variant

@@ -218,21 +218,25 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
   }
   
   if (schema.type === "object") {
-    // Check for record type (object with additionalProperties but no properties)
-    if (schema.additionalProperties !== undefined && (!schema.properties || Object.keys(schema.properties).length === 0)) {
-      let valueSchema: ZexBase<any>;
-      if (schema.additionalProperties === true || (typeof schema.additionalProperties === 'object' && Object.keys(schema.additionalProperties).length === 0)) {
-        // additionalProperties: true or {} means any value
-        valueSchema = zex.any();
-      } else if (schema.additionalProperties === false) {
-        // additionalProperties: false means no additional properties allowed
-        // This should not be a record type, but a strict object
-        return zex.object({}, false, "strict").meta(meta) as ZexBase<any>;
-      } else {
-        // additionalProperties: schema means specific schema
-        valueSchema = fromJsonSchemaInternal(schema.additionalProperties, [...path, "additionalProperties"], root);
+    // Check for explicit record type marker
+    if (schema.format === "record") {
+      // A record that doesn't allow properties is meaningless. Throw an error.
+      if (schema.additionalProperties === false) {
+        throw new Error(`A schema with "format": "record" cannot have "additionalProperties": false.`);
       }
+
+      // 'additionalProperties' is the schema. If it's missing, it's 'any'.
+      const valueSchema = fromJsonSchemaInternal(
+        schema.additionalProperties || {}, // Fallback to empty object -> zex.any()
+        [...path, "additionalProperties"], 
+        root
+      );
       return zex.record(valueSchema).meta(meta) as ZexBase<any>;
+    }
+
+    // Check for jsonschema type marker
+    if (schema.format === "jsonschema") {
+      return zex.jsonschema().meta(meta) as ZexBase<any>;
     }
     
     // Regular object
@@ -277,57 +281,15 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
   }
   
   if (Array.isArray(schema.anyOf)) {
-    // Try to detect discriminated union pattern: prefer OpenAPI discriminator if present
-    const openApiDiscriminator = (schema as any).discriminator;
-    if (openApiDiscriminator && typeof openApiDiscriminator === 'object' && typeof openApiDiscriminator.propertyName === 'string') {
-      const key = openApiDiscriminator.propertyName as string;
+    // Check for explicit discriminator (JSON Schema Draft 2020-12 / OpenAPI standard)
+    const discriminator = (schema as any).discriminator;
+    if (discriminator && typeof discriminator === 'object' && typeof discriminator.propertyName === 'string') {
+      const key = discriminator.propertyName as string;
       const reconstructedVariants = (schema.anyOf as any[]).map((v, i) => fromJsonSchemaInternal(v, [...path, `anyOf[${i}]`], root)) as any[];
       return (zex as any).discriminatedUnion(key, ...reconstructedVariants).meta(meta) as ZexBase<any>;
     }
-
-    // Otherwise: all variants are objects with the same discriminator key K
-    const variants = schema.anyOf as any[];
-    // Collect candidate discriminator keys: properties that are const and required, present in all variants
-    const candidateKeys = new Map<string, { values: unknown[]; ok: boolean }>();
-    const variantObjects: any[] = [];
-    for (const v of variants) {
-      if (v && typeof v === 'object' && v.type === 'object' && v.properties && typeof v.properties === 'object') {
-        variantObjects.push(v);
-      } else {
-        variantObjects.length = 0; // mark not DU
-        break;
-      }
-    }
-    if (variantObjects.length === variants.length && variants.length > 0) {
-      // Build key -> list of const values across variants when required
-      for (let i = 0; i < variantObjects.length; i++) {
-        const v = variantObjects[i];
-        const required = Array.isArray(v.required) ? v.required : [];
-        for (const [k, prop] of Object.entries(v.properties as Record<string, any>)) {
-          if (required.includes(k) && prop && typeof prop === 'object' && 'const' in prop) {
-            if (!candidateKeys.has(k)) candidateKeys.set(k, { values: [], ok: true });
-            candidateKeys.get(k)!.values.push((prop as any).const);
-          }
-        }
-      }
-      // Choose a key that appears in every variant and has unique const values
-      let chosenKey: string | undefined;
-      for (const [k, info] of candidateKeys.entries()) {
-        if (info.values.length === variants.length) {
-          const set = new Set(info.values.map(v => JSON.stringify(v)));
-          if (set.size === info.values.length) {
-            chosenKey = k;
-            break;
-          }
-        }
-      }
-      if (chosenKey) {
-        // Reconstruct discriminated union
-        const reconstructedVariants = variantObjects.map((v, i) => fromJsonSchemaInternal(v, [...path, `anyOf[${i}]`], root)) as any[];
-        return (zex as any).discriminatedUnion(chosenKey, ...reconstructedVariants).meta(meta) as ZexBase<any>;
-      }
-    }
-    // Fallback: regular union
+    
+    // Fallback: regular union (no discriminator detection)
     return zex.union(...(schema.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `anyOf[${i}]`], root)))).meta(meta) as ZexBase<any>;
   }
 

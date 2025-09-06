@@ -340,6 +340,7 @@ export class ZexRecord<T extends ZexBase<any, any>> extends ZexBase<Record<strin
     
     return {
       type: "object",
+      format: "record",
       properties: {}, // Always include for parser compatibility
       additionalProperties: additionalProps as any
     };

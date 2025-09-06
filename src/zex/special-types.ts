@@ -126,6 +126,7 @@ export class ZexJsonSchema extends ZexBase<JsonSchema> {
   protected getBaseJsonSchema(): JsonSchema {
     return {
       type: "object",
+      format: "jsonschema",
       description: "JSON Schema object"
     };
   }
