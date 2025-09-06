@@ -88,6 +88,19 @@ function buildPathString(path: (string | number)[], root?: string): string {
   return (root ? [root, ...path] : path).join(".");
 }
 
+// Helper function to detect meta-only schemas (schemas with only metadata, no structural keywords)
+function isMetaOnlySchema(schema: any): boolean {
+  if (typeof schema !== 'object' || schema === null) return false;
+  
+  const structuralKeys = [
+    'type', 'properties', 'items', 'required', 'enum', 'anyOf', 'allOf', 'oneOf', 'additionalProperties',
+    'minLength', 'maxLength', 'minimum', 'maximum', 'pattern', 'const', '$ref'
+  ];
+  
+  const keys = Object.keys(schema);
+  return keys.length > 0 && !keys.some(k => structuralKeys.includes(k));
+}
+
 function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
   // Support boolean schemas: true means "accept anything"
   if (schema === true) {
@@ -114,6 +127,23 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (["title","description","examples","format","type","properties","items","required","enum","anyOf","allOf","oneOf","additionalProperties","minLength","maxLength","minimum","maximum","pattern","readOnly","writeOnly"].indexOf(k) === -1) {
       meta[k] = schema[k];
     }
+  }
+
+  // Check for meta-only schemas (schemas with only metadata, no structural keywords)
+  if (isMetaOnlySchema(schema)) {
+    return zex.any().meta(meta) as ZexBase<any>;
+  }
+
+  // Reject complex composition keywords with helpful error messages
+  const errorPath = buildPathString(path, root);
+  if (schema.allOf) {
+    throw new Error(`fromJsonSchema: "allOf" is not supported at path '${errorPath}'. Use zex.object().extend() for object composition instead.`);
+  }
+  if (schema.oneOf) {
+    throw new Error(`fromJsonSchema: "oneOf" is not supported at path '${errorPath}'. Use zex.union() instead.`);
+  }
+  if (schema.not) {
+    throw new Error(`fromJsonSchema: "not" is not supported at path '${errorPath}'. Use zex.union() with specific types instead.`);
   }
 
   // URI-Schema Spezialbehandlung
@@ -311,23 +341,9 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - null is not a valid schema. Use { type: "object", additionalProperties: true } or similar.`);
   }
   
-  // Check for schema without type. If it only carries meta (e.g., title/description/format/readOnly/writeOnly/unknown ext keys),
-  // treat it as "any" and preserve meta. Otherwise, error out.
-  if (typeof schema === 'object' && schema !== null && !schema.type && !schema.enum && !schema.anyOf && !schema.allOf && !schema.oneOf && !schema.const && !schema.$ref) {
-    const keys = Object.keys(schema);
-    const structuralKeys = [
-      'type','properties','items','required','enum','anyOf','allOf','oneOf','additionalProperties',
-      'minLength','maxLength','minimum','maximum','pattern','const','$ref'
-    ];
-    const nonMetaPresent = keys.some(k => structuralKeys.includes(k));
-    if (!nonMetaPresent) {
-      // Meta-only schema → interpret as any with meta
-      return zex.any().meta(meta) as ZexBase<any>;
-    }
-    throw new Error(`fromJsonSchema: Invalid JSON Schema at path '${pathString}' - missing required 'type' field. Found keys: [${keys.join(', ')}]. Add 'type' field or use { type: "object", additionalProperties: true } for any value.`);
-  }
-  
-  throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${pathString}'`);
+  // If we reach here, the schema has structural keywords but we don't support them
+  const keys = Object.keys(schema);
+  throw new Error(`fromJsonSchema: Unsupported or unknown schema feature at path '${pathString}'. Found keys: [${keys.join(', ')}].`);
 }
 
 // Public functions

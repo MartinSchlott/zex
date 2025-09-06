@@ -35,6 +35,16 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
 - ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
 
+## What's New in 0.2.0
+
+- 🚀 **Explicit Type Markers**: Records and jsonschema types now use `format` markers for perfect roundtrip preservation
+- 🛡️ **Better Error Messages**: Clear guidance when importing unsupported JSON Schema features (`allOf`, `oneOf`, `not`)
+- ⚡ **Performance Improvements**: Meta-only schemas now use early exit pattern
+- 🔧 **Lua Byte-String Decoding**: Fixed parsing of byte arrays in unions and discriminated unions
+- 📋 **JSON Schema Standards**: Discriminated unions now use Draft 2020-12 discriminator format
+
+*See [CHANGELOG.md](./CHANGELOG.md) for full details.*
+
 ## Quick Start
 
 ```typescript
@@ -108,6 +118,15 @@ const jsonSchema = schema.toJSONSchema({
 
 // Parse from JSON Schema
 const recreated = zex.fromJsonSchema(jsonSchema);
+
+// Explicit type markers for perfect roundtrips
+const recordSchema = zex.record(zex.string());
+const jsonSchema = recordSchema.toJSONSchema();
+// Exports: { "type": "object", "format": "record", "additionalProperties": { "type": "string" } }
+
+const jsonschemaType = zex.jsonschema();
+const jsonschemaJson = jsonschemaType.toJSONSchema();
+// Exports: { "type": "object", "format": "jsonschema", "description": "JSON Schema object" }
 ```
 
 - Import mapping for number bounds:
@@ -219,9 +238,15 @@ Note: `zex.number()` is finite-only; it rejects `NaN`, `Infinity`, and `-Infinit
 
 Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes (e.g., `union(...schemas)` statt `union([schemas])`, strict by default), but the improved type safety and clearer errors make it worth it.
 
+### Breaking Changes in 0.2.0
+
+- **JSON Schema Import**: `allOf`, `oneOf`, and `not` now throw clear errors instead of being silently ignored
+  - Use `zex.object().extend()` instead of `allOf`
+  - Use `zex.union()` instead of `oneOf`/`not`
+
 ## Version
 
-Current: `0.1.26`.
+Current: `0.2.0`.
 
 ## Built with AI in One Day
 
