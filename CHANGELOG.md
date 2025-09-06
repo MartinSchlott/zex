@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.1] - 2025-01-27
+
+### New Features
+- **JSON-Serializable Type**: Added `zex.json()` for clear intent signaling
+  - Accepts any JSON-serializable data (objects, arrays, primitives)
+  - Rejects functions and binary data (Uint8Array, Buffer) recursively
+  - Provides semantic clarity over `zex.any()` for JSON-compatible fields
+  - Same flexibility as `zex.any()` but with better documentation intent
+  - Includes comprehensive test coverage and documentation
+
 ## [0.2.0] - 2025-09-06 
 
 ### Breaking Changes

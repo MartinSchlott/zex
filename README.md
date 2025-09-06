@@ -94,6 +94,28 @@ const fileSchema = zex.object({
 });
 ```
 
+### JSON-Serializable Data
+```typescript
+const configSchema = zex.object({
+  // Clear intent: this should be JSON-serializable
+  userData: zex.json().describe("User data that will be stored as JSON"),
+  settings: zex.json().optional(),
+  
+  // vs unclear intent:
+  // userData: zex.any(),
+});
+
+// Accepts objects, arrays, primitives
+configSchema.parse({
+  userData: { name: "John", preferences: { theme: "dark" } },
+  settings: { notifications: true }
+});
+
+// Rejects functions and binary data
+// configSchema.parse({ userData: () => {} }); // ❌ Error
+// configSchema.parse({ userData: new Uint8Array([1,2,3]) }); // ❌ Error
+```
+
 ### Lua Data Transformation
 ```typescript
 // Lua arrays are 1-indexed objects
@@ -194,6 +216,7 @@ const schema = zex.object({
 - `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`
 - `zex.number()` - Number validation (finite-only) with `.int()`, `.min()`, `.max()`, `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
 - `zex.boolean()` - Boolean validation
+- `zex.json()` - JSON-serializable data (rejects functions and binary data)
 - `zex.buffer(mimeType?)` - Binary data validation
 - `zex.any()` - Any value (use sparingly)
 - `zex.null()` - Null values only

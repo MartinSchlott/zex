@@ -18,6 +18,7 @@ await runImport('./unit/basic/string.test.ts');
 await runImport('./unit/basic/number.test.ts');
 await runImport('./unit/basic/number-positivity.test.ts');
 await runImport('./unit/basic/boolean.test.ts');
+await runImport('./unit/basic/json.test.ts');
 
 // Unit: complex
 await runImport('./unit/complex/object.test.ts');

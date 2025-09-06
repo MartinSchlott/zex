@@ -3,7 +3,7 @@
 
 import { JsonSchema } from './types.js';
 import { ZexBase } from './base.js';
-import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue } from './basic-types.js';
+import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue, ZexJson } from './basic-types.js';
 import { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types.js';
 import { ZexLiteral } from './literal.js';
 import { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
@@ -16,6 +16,7 @@ export const zex = {
   number: () => new ZexNumber(),
   boolean: () => new ZexBoolean(),
   any: () => new ZexAny(),
+  json: () => new ZexJson(),
   null: () => new ZexNull(),
   buffer: (mimeType?: string) => new ZexBuffer(mimeType),
   function: () => new ZexFunction(),

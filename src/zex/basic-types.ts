@@ -441,3 +441,103 @@ export class ZexTValue<TFlags extends Record<string, boolean> = {}> extends ZexB
     return { success: true };
   }
 }
+
+// JSON implementation - accepts any JSON-serializable data
+export class ZexJson<TFlags extends Record<string, boolean> = {}> extends ZexBase<any, TFlags> {
+  protected clone(newConfig: ZexConfig): this {
+    return new ZexJson(newConfig) as this;
+  }
+
+  protected getBaseJsonSchema(): JsonSchema {
+    return {}; // Same as zex.any() - no constraints
+  }
+
+  protected transformLua(data: unknown): unknown {
+    // Reuse ZexAny's Lua normalization logic
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const isZeroBasedByteObject = (obj: Record<string, unknown>): Uint8Array | null => {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return null;
+      // all numeric keys 0..N-1
+      if (!keys.every(k => /^\d+$/.test(k))) return null;
+      const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+      for (let i = 0; i < ints.length; i++) if (ints[i] !== i) return null;
+      // values 0..255
+      for (const k of keys) {
+        const v = (obj as any)[k];
+        if (typeof v !== 'number' || v < 0 || v > 255 || !Number.isInteger(v)) return null;
+      }
+      const arr = new Uint8Array(ints.length);
+      for (let i = 0; i < ints.length; i++) arr[i] = (obj as any)[String(i)] as number;
+      return arr;
+    };
+    const visited = new WeakSet<object>();
+    let nodes = 0;
+    const maxNodes = 10000;
+    const normalize = (node: unknown): unknown => {
+      nodes++;
+      if (nodes > maxNodes) return node;
+      if (node instanceof Uint8Array) return decoder.decode(node);
+      if (typeof ArrayBuffer !== 'undefined' && node instanceof ArrayBuffer) return decoder.decode(new Uint8Array(node));
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(node)) return decoder.decode(new Uint8Array(node as unknown as Buffer));
+      if (Array.isArray(node)) return node.map(normalize);
+      if (node && typeof node === 'object') {
+        if (visited.has(node as object)) return node;
+        visited.add(node as object);
+        const obj = node as Record<string, unknown>;
+        // JSON-serialized Buffer
+        if ((obj as any).type === 'Buffer' && Array.isArray((obj as any).data)) {
+          const u8 = Uint8Array.from(((obj as any).data as number[]));
+          return decoder.decode(u8);
+        }
+        // Zero-based byte object (0..N)
+        const possible = isZeroBasedByteObject(obj);
+        if (possible) return decoder.decode(possible);
+        // Lua array 1..N → array
+        const keys = Object.keys(obj);
+        if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+          const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+          let isOneBasedContiguous = true;
+          for (let i = 0; i < ints.length; i++) if (ints[i] !== i + 1) { isOneBasedContiguous = false; break; }
+          if (isOneBasedContiguous) {
+            const arr: unknown[] = [];
+            for (const n of ints) arr.push(normalize((obj as any)[String(n)]));
+            return arr;
+          }
+        }
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(obj)) out[k] = normalize(v);
+        return out;
+      }
+      return node;
+    };
+    return normalize(data);
+  }
+
+  protected validateType(data: unknown): { success: true } | { success: false; error: string } {
+    // Check for non-JSON types recursively
+    const checkJsonCompatible = (value: unknown, path: string[] = []): { success: true } | { success: false; error: string } => {
+      if (typeof value === 'function') {
+        return { success: false, error: 'Functions are not JSON-serializable' };
+      }
+      if (value instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))) {
+        return { success: false, error: 'Binary data (Buffer/Uint8Array) is not JSON-serializable' };
+      }
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          const result = checkJsonCompatible(value[i], [...path, `[${i}]`]);
+          if (!result.success) return result;
+        }
+      }
+      if (value && typeof value === 'object') {
+        for (const [key, val] of Object.entries(value)) {
+          const result = checkJsonCompatible(val, [...path, key]);
+          if (!result.success) return result;
+        }
+      }
+      return { success: true };
+    };
+    
+    return checkJsonCompatible(data);
+  }
+}
