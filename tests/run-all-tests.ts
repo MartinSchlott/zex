@@ -43,6 +43,7 @@ await runImport('./behavior/lua-jsonschema-debug.test.ts');
 await runImport('./behavior/discriminator-test.test.ts');
 await runImport('./behavior/discriminator-export-test.test.ts');
 await runImport('./behavior/llm-roundtrip-lua.test.ts');
+await runImport('./behavior/optional-omission.test.ts');
 
 // JSON Schema
 await runImport('./jsonschema/to-from-roundtrip.test.ts');

@@ -261,7 +261,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         const value = (validatedData as any)[key];
         if (value === undefined) {
           if ((schema as any).config?.optional) {
-            result[key] = undefined;
+            // Omit missing optional keys entirely
             continue;
           }
           if ((schema as any).config?.defaultValue !== undefined) {
@@ -291,8 +291,8 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
       } else {
         // Field is optional or has default - apply default if present
         if ((schema as any).config?.optional) {
-          // For optional fields, just set to undefined
-          result[key] = undefined;
+          // Omit entirely for optionals
+          // no-op
         } else {
           // For fields with defaults, parse with undefined to trigger default
           const fieldPath = [...path, {

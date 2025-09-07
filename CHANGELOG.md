@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.3] - 2025-01-27
+
+### Changed
+- Optional object properties are now omitted when missing (no `key: undefined`)
+  - Applies to both `parse` and `parseFromLua`
+  - Avoids cross-runtime coercion of `undefined` into placeholder objects
+  - Aligns with JSON behavior (`JSON.stringify` drops undefined properties)
+
 ## [0.2.2] - 2025-01-27
 
 ### Fixed
