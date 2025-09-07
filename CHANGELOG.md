@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.2] - 2025-01-27
+
+### Fixed
+- Importer now correctly reconstructs discriminated unions nested inside arrays
+  - When importing `type: "array"` with `items.anyOf` and `items.discriminator.propertyName`,
+    `fromJsonSchema` builds a `discriminatedUnion` for the item schema instead of a plain union
+  - Fixes roundtrip where nested DU fields were dropped during Lua pre-transform
+  - Ensures `messages[].role` DUs survive roundtrip and `safeParseFromLua` preserves variant fields
+
+### Notes
+- Export already emitted standards-conform JSON Schema (Draft 2020-12): `anyOf` + `discriminator`
+- This release aligns importer behavior with exporter for nested DU scenarios
+
 ## [0.2.1] - 2025-01-27
 
 ### New Features

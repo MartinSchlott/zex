@@ -1,0 +1,350 @@
+import { zex } from '../_imports.js';
+import { expectOk, expectFail } from '../_utils.js';
+
+console.log("\n=== BEHAVIOR: Lua byte strings in JSON Schema records ===");
+
+// Test the exact JSON Schema from the user's issue
+const jsonSchema = {
+  type: "object",
+  properties: {
+    messages: {
+      type: "array",
+      items: {
+        anyOf: [
+          {
+            type: "object",
+            properties: {
+              createdAt: {
+                type: "number",
+                description: "Unix timestamp (ms) when the message was created.",
+                default: 0,
+              },
+              tokenCount: {
+                type: "number",
+                description: "Estimated or measured number of tokens in this message.",
+                default: 0,
+              },
+              role: {
+                const: "system",
+              },
+              content: {
+                type: "string",
+                description: "System prompt content injected into the conversation.",
+              },
+            },
+            required: [
+              "role",
+              "content",
+            ],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: {
+                type: "number",
+                description: "Unix timestamp (ms) when the message was created.",
+                default: 0,
+              },
+              tokenCount: {
+                type: "number",
+                description: "Estimated or measured number of tokens in this message.",
+                default: 0,
+              },
+              role: {
+                const: "user",
+              },
+              content: {
+                type: "string",
+                description: "User's message content.",
+              },
+              outputSchema: {
+                type: "object",
+                format: "record",
+                properties: {
+                },
+                additionalProperties: true,
+                description: "Schema for the response of the user message. If not provided, the response will be a string.",
+              },
+            },
+            required: [
+              "role",
+              "content",
+            ],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: {
+                type: "number",
+                description: "Unix timestamp (ms) when the message was created.",
+                default: 0,
+              },
+              tokenCount: {
+                type: "number",
+                description: "Estimated or measured number of tokens in this message.",
+                default: 0,
+              },
+              role: {
+                const: "assistant",
+              },
+              content: {
+                type: "string",
+                description: "Assistant's textual response, or null if only tool calls were made.",
+              },
+              structured: {
+                type: "object",
+                format: "record",
+                properties: {
+                },
+                additionalProperties: true,
+                description: "Parsed JSON object when the user message specified an outputSchema and the response was valid JSON.",
+              },
+              toolCalls: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                      description: "ID of the tool call given by the LLM.",
+                    },
+                    toolName: {
+                      type: "string",
+                      description: "Name of the tool to be called.",
+                    },
+                    arguments: {
+                      type: "object",
+                      format: "record",
+                      properties: {
+                      },
+                      additionalProperties: true,
+                      description: "Arguments for the function, als JSON-Objekt.",
+                    },
+                  },
+                  required: [
+                    "id",
+                    "toolName",
+                    "arguments",
+                  ],
+                  additionalProperties: false,
+                },
+                description: "Tool calls issued by the assistant.",
+              },
+              stopReason: {
+                enum: [
+                  "stop",
+                  "length",
+                  "content-filter",
+                  "tool-calls",
+                  "error",
+                  "other",
+                  "unknown",
+                ],
+                description: "Reason for stopping the LLM response.",
+              },
+            },
+            required: [
+              "role",
+              "content",
+            ],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: {
+                type: "number",
+                description: "Unix timestamp (ms) when the message was created.",
+                default: 0,
+              },
+              tokenCount: {
+                type: "number",
+                description: "Estimated or measured number of tokens in this message.",
+                default: 0,
+              },
+              role: {
+                const: "tool",
+              },
+              content: {
+                type: "string",
+                description: "Serialized result string of the tool's output.",
+              },
+              id: {
+                type: "string",
+                description: "ID of the ToolCall this tool message responds to. The ID was given by the LLM.",
+              },
+              name: {
+                type: "string",
+                description: "Name of the tool/function that was executed.",
+              },
+            },
+            required: [
+              "role",
+              "content",
+              "id",
+              "name",
+            ],
+            additionalProperties: false,
+          },
+        ],
+        discriminator: {
+          propertyName: "role"
+        },
+        description: "LLMMessage - Any message in the conversation with role-specific structure.",
+      },
+      description: "Chronological sequence of exchanged messages.",
+    },
+    tools: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Unique tool identifier",
+          },
+          description: {
+            type: "string",
+            description: "Description of what this endpoint does",
+          },
+          inputSchema: {
+            type: "object",
+            format: "jsonschema",
+            description: "JSON Schema for input validation",
+          },
+          outputSchema: {
+            type: "object",
+            format: "jsonschema",
+            description: "JSON Schema for output structure",
+          },
+        },
+        required: [
+          "name",
+          "description",
+          "inputSchema",
+        ],
+        additionalProperties: false,
+        description: "Operator endpoint definition",
+      },
+      description: "Tools available to the assistant in this session.",
+    },
+  },
+  required: [
+    "messages",
+  ],
+  additionalProperties: false,
+  description: "LLMConversationState - Represents the current context of an assistant session.",
+};
+
+// Create schema from JSON Schema
+const schema = zex.fromJsonSchema(jsonSchema);
+
+// Test data with Uint8Array values (simulating Fengari output)
+const luaData = {
+  messages: [
+    {
+      role: new Uint8Array([115, 121, 115, 116, 101, 109]), // "system"
+      content: new Uint8Array([89, 111, 117, 32, 97, 114, 101, 32, 97, 32, 110, 101, 119, 115, 108, 101, 116, 116, 101, 114, 32, 99, 111, 110, 116, 101, 110, 116, 32, 112, 97, 114, 115, 101, 114, 32, 115, 112, 101, 99, 105, 97, 108, 105, 122, 101, 100, 32, 105, 110, 32, 101, 120, 116, 114, 97, 99, 116, 105, 110, 103, 32, 102, 97, 99, 116, 117, 97, 108, 32, 65, 73, 32, 97, 110, 100, 32, 116, 101, 99, 104, 110, 111, 108, 111, 103, 121, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 115, 32, 102, 114, 111, 109, 32, 118, 97, 114, 105, 111, 117, 115, 32, 110, 101, 119, 115, 108, 101, 116, 116, 101, 114, 32, 102, 111, 114, 109, 97, 116, 115, 46, 32, 89, 111, 117, 114, 32, 116, 97, 115, 107, 32, 105, 115, 32, 116, 111, 32, 105, 100, 101, 110, 116, 105, 102, 121, 32, 97, 110, 100, 32, 101, 120, 116, 114, 97, 99, 116, 32, 111, 110, 108, 121, 32, 99, 111, 110, 99, 114, 101, 116, 101, 44, 32, 102, 97, 99, 116, 117, 97, 108, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 115, 32, 97, 110, 100, 32, 99, 111, 110, 118, 101, 114, 116, 32, 116, 104, 101, 109, 32, 105, 110, 116, 111, 32, 97, 32, 115, 116, 97, 110, 100, 97, 114, 100, 105, 122, 101, 100, 32, 74, 83, 79, 78, 32, 102, 111, 114, 109, 97, 116, 46, 10, 10, 69, 88, 84, 82, 65, 67, 84, 73, 79, 78, 32, 82, 85, 76, 69, 83, 58, 10, 49, 46, 32, 69, 120, 116, 114, 97, 99, 116, 32, 79, 78, 76, 89, 32, 102, 97, 99, 116, 117, 97, 108, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 115, 58, 32, 112, 114, 111, 100, 117, 99, 116, 32, 114, 101, 108, 101, 97, 115, 101, 115, 44, 32, 99, 111, 109, 112, 97, 110, 121, 32, 97, 110, 110, 111, 117, 110, 99, 101, 109, 101, 110, 116, 115, 44, 32, 102, 117, 110, 100, 105, 110, 103, 32, 114, 111, 117, 110, 100, 115, 44, 32, 114, 101, 115, 101, 97, 114, 99, 104, 32, 114, 101, 115, 117, 108, 116, 115, 44, 32, 112, 111, 108, 105, 99, 121, 32, 99, 104, 97, 110, 103, 101, 115, 44, 32, 112, 97, 114, 116, 110, 101, 114, 115, 104, 105, 112, 115, 44, 32, 97, 99, 113, 117, 105, 115, 105, 116, 105, 111, 110, 115, 10, 50, 46, 32, 69, 88, 67, 76, 85, 68, 69, 58, 32, 111, 112, 105, 110, 105, 111, 110, 115, 44, 32, 97, 110, 97, 108, 121, 115, 105, 115, 44, 32, 99, 111, 109, 109, 101, 110, 116, 97, 114, 121, 44, 32, 112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 115, 44, 32, 34, 101, 120, 112, 101, 114, 116, 32, 116, 97, 107, 101, 115, 34, 44, 32, 109, 97, 114, 107, 101, 116, 32, 115, 112, 101, 99, 117, 108, 97, 116, 105, 111, 110, 10, 51, 46, 32, 69, 88, 67, 76, 85, 68, 69, 58, 32, 97, 100, 118, 101, 114, 116, 105, 115, 101, 109, 101, 110, 116, 115, 44, 32, 115, 112, 111, 110, 115, 111, 114, 101, 100, 32, 99, 111, 110, 116, 101, 110, 116, 44, 32, 106, 111, 98, 32, 108, 105, 115, 116, 105, 110, 103, 115, 44, 32, 112, 111, 108, 108, 115, 44, 32, 97, 110, 100, 32, 103, 101, 110, 101, 114, 97, 108, 32, 98, 117, 115, 105, 110, 101, 115, 115, 32, 110, 101, 119, 115, 32, 117, 110, 108, 101, 115, 115, 32, 100, 105, 114, 101, 99, 116, 108, 121, 32, 116, 101, 99, 104, 45, 114, 101, 108, 97, 116, 101, 100, 10, 52, 46, 32, 69, 97, 99, 104, 32, 116, 111, 112, 105, 99, 32, 115, 104, 111, 117, 108, 100, 32, 98, 101, 32, 97, 32, 100, 105, 115, 116, 105, 110, 99, 116, 44, 32, 115, 116, 97, 110, 100, 97, 108, 111, 110, 101, 32, 102, 97, 99, 116, 117, 97, 108, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 10, 53, 46, 32, 67, 111, 109, 98, 105, 110, 101, 32, 114, 101, 108, 97, 116, 101, 100, 32, 102, 97, 99, 116, 117, 97, 108, 32, 105, 110, 102, 111, 114, 109, 97, 116, 105, 111, 110, 32, 115, 99, 97, 116, 116, 101, 114, 101, 100, 32, 97, 99, 114, 111, 115, 115, 32, 116, 104, 101, 32, 110, 101, 119, 115, 108, 101, 116, 116, 101, 114, 32, 105, 110, 116, 111, 32, 115, 105, 110, 103, 108, 101, 32, 99, 111, 104, 101, 114, 101, 110, 116, 32, 116, 111, 112, 105, 99, 115, 10, 54, 46, 32, 80, 114, 101, 115, 101, 114, 118, 101, 32, 102, 97, 99, 116, 117, 97, 108, 32, 97, 99, 99, 117, 114, 97, 99, 121, 32, 45, 32, 100, 111, 32, 110, 111, 116, 32, 105, 110, 118, 101, 110, 116, 32, 111, 114, 32, 101, 109, 98, 101, 108, 108, 105, 115, 104, 32, 100, 101, 116, 97, 105, 108, 115, 10, 10, 70, 65, 67, 84, 85, 65, 76, 32, 118, 115, 32, 79, 80, 73, 78, 73, 79, 78, 32, 69, 88, 65, 77, 80, 76, 69, 83, 58, 10, 226, 156, 133, 32, 69, 88, 84, 82, 65, 67, 84, 58, 32, 34, 79, 112, 101, 110, 65, 73, 32, 114, 101, 108, 101, 97, 115, 101, 100, 32, 71, 80, 84, 45, 53, 32, 119, 105, 116, 104, 32, 52, 48, 37, 32, 98, 101, 116, 116, 101, 114, 32, 112, 101, 114, 102, 111, 114, 109, 97, 110, 99, 101, 34, 10, 226, 156, 133, 32, 69, 88, 84, 82, 65, 67, 84, 58, 32, 34, 84, 101, 115, 108, 97, 32, 115, 105, 103, 110, 101, 100, 32, 36, 49, 54, 46, 53, 66, 32, 100, 101, 97, 108, 32, 119, 105, 116, 104, 32, 83, 97, 109, 115, 117, 110, 103, 32, 102, 111, 114, 32, 65, 73, 32, 99, 104, 105, 112, 115, 34, 10, 226, 156, 133, 32, 69, 88, 84, 82, 65, 67, 84, 58, 32, 34, 83, 116, 117, 100, 121, 32, 115, 104, 111, 119, 115, 32, 65, 73, 32, 97, 99, 104, 105, 101, 118, 101, 100, 32, 103, 111, 108, 100, 32, 109, 101, 100, 97, 108, 32, 97, 116, 32, 77, 97, 116, 104, 32, 79, 108, 121, 109, 112, 105, 97, 100, 34, 10, 226, 156, 133, 32, 69, 88, 84, 82, 65, 67, 84, 58, 32, 34, 90, 46, 97, 105, 39, 115, 32, 110, 101, 119, 32, 109, 111, 100, 101, 108, 32, 99, 111, 115, 116, 115, 32, 56, 55, 37, 32, 108, 101, 115, 115, 32, 116, 104, 97, 110, 32, 68, 101, 101, 112, 83, 101, 101, 107, 32, 97, 116, 32, 50, 56, 32, 99, 101, 110, 116, 115, 32, 112, 101, 114, 32, 109, 105, 108, 108, 105, 111, 110, 32, 116, 111, 107, 101, 110, 115, 34, 10, 226, 157, 140, 32, 83, 75, 73, 80, 58, 32, 34, 86, 105, 101, 116, 110, 97, 109, 39, 115, 32, 99, 104, 105, 112, 32, 105, 110, 100, 117, 115, 116, 114, 121, 32, 105, 115, 32, 101, 109, 101, 114, 103, 105, 110, 103, 32, 97, 115, 32, 119, 105, 110, 110, 101, 114, 32, 105, 110, 32, 85, 83, 45, 67, 104, 105, 110, 97, 32, 116, 114, 97, 100, 101, 32, 119, 97, 114, 34, 10, 226, 157, 140, 32, 83, 75, 73, 80, 58, 32, 34, 84, 104, 105, 115, 32, 99, 111, 117, 108, 100, 32, 98, 101, 32, 97, 32, 103, 97, 109, 101, 45, 99, 104, 97, 110, 103, 101, 114, 32, 102, 111, 114, 32, 116, 104, 101, 32, 105, 110, 100, 117, 115, 116, 114, 121, 34, 10, 226, 157, 140, 32, 83, 75, 73, 80, 58, 32, 34, 69, 120, 112, 101, 114, 116, 115, 32, 98, 101, 108, 105, 101, 118, 101, 32, 116, 104, 105, 115, 32, 116, 114, 101, 110, 100, 32, 119, 105, 108, 108, 32, 99, 111, 110, 116, 105, 110, 117, 101, 34, 10, 10, 79, 85, 84, 80, 85, 84, 32, 70, 79, 82, 77, 65, 84, 58, 10, 82, 101, 116, 117, 114, 110, 32, 97, 32, 74, 83, 79, 78, 32, 111, 98, 106, 101, 99, 116, 32, 119, 105, 116, 104, 32, 97, 32, 34, 116, 111, 112, 105, 99, 115, 34, 32, 97, 114, 114, 97, 121, 46, 32, 69, 97, 99, 104, 32, 116, 111, 112, 105, 99, 32, 109, 117, 115, 116, 32, 104, 97, 118, 101, 58, 10, 45, 32, 104, 101, 97, 100, 108, 105, 110, 101, 58, 32, 67, 111, 110, 99, 105, 115, 101, 44, 32, 102, 97, 99, 116, 117, 97, 108, 32, 116, 105, 116, 108, 101, 32, 40, 109, 97, 120, 32, 49, 48, 48, 32, 99, 104, 97, 114, 97, 99, 116, 101, 114, 115, 41, 10, 45, 32, 99, 111, 110, 116, 101, 110, 116, 58, 32, 50, 45, 51, 32, 115, 101, 110, 116, 101, 110, 99, 101, 32, 115, 117, 109, 109, 97, 114, 121, 32, 111, 102, 32, 116, 104, 101, 32, 102, 97, 99, 116, 117, 97, 108, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 10, 45, 32, 117, 114, 108, 58, 32, 79, 114, 105, 103, 105, 110, 97, 108, 32, 85, 82, 76, 32, 105, 102, 32, 109, 101, 110, 116, 105, 111, 110, 101, 100, 44, 32, 111, 116, 104, 101, 114, 119, 105, 115, 101, 32, 110, 117, 108, 108, 10, 45, 32, 115, 111, 117, 114, 99, 101, 58, 32, 78, 97, 109, 101, 32, 111, 102, 32, 116, 104, 101, 32, 110, 101, 119, 115, 108, 101, 116, 116, 101, 114, 47, 112, 117, 98, 108, 105, 99, 97, 116, 105, 111, 110, 10, 45, 32, 100, 97, 116, 101, 58, 32, 84, 111, 100, 97, 121, 39, 115, 32, 100, 97, 116, 101, 32, 105, 110, 32, 89, 89, 89, 89, 45, 77, 77, 45, 68, 68, 32, 102, 111, 114, 109, 97, 116, 10, 10, 70, 111, 99, 117, 115, 32, 111, 110, 32, 99, 111, 110, 99, 114, 101, 116, 101, 44, 32, 118, 101, 114, 105, 102, 105, 97, 98, 108, 101, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 115, 32, 116, 104, 97, 116, 32, 114, 101, 112, 114, 101, 115, 101, 110, 116, 32, 97, 99, 116, 117, 97, 108, 32, 101, 118, 101, 110, 116, 115, 32, 111, 114, 32, 97, 110, 110, 111, 117, 110, 99, 101, 109, 101, 110, 116, 115, 44, 32, 110, 111, 116, 32, 105, 110, 116, 101, 114, 112, 114, 101, 116, 97, 116, 105, 111, 110, 115, 32, 111, 114, 32, 112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 115, 32, 97, 98, 111, 117, 116, 32, 116, 104, 101, 105, 114, 32, 115, 105, 103, 110, 105, 102, 105, 99, 97, 110, 99, 101, 46]), // Long system message
+    },
+    {
+      role: new Uint8Array([117, 115, 101, 114]), // "user"
+      content: new Uint8Array([84, 111, 100, 97, 121, 32, 79, 112, 101, 110, 65, 73, 32, 97, 110, 110, 111, 117, 110, 99, 101, 100, 32, 116, 104, 101, 32, 114, 101, 108, 101, 97, 115, 101, 32, 111, 102, 32, 71, 80, 84, 45, 53, 44, 32, 119, 104, 105, 99, 104, 32, 115, 104, 111, 119, 115, 32, 53, 48, 37, 32, 105, 109, 112, 114, 111, 118, 101, 109, 101, 110, 116, 32, 105, 110, 32, 114, 101, 97, 115, 111, 110, 105, 110, 103, 32, 116, 97, 115, 107, 115, 32, 99, 111, 109, 112, 97, 114, 101, 100, 32, 116, 111, 32, 71, 80, 84, 45, 52, 46, 32, 84, 104, 101, 32, 109, 111, 100, 101, 108, 32, 119, 105, 108, 108, 32, 98, 101, 32, 97, 118, 97, 105, 108, 97, 98, 108, 101, 32, 118, 105, 97, 32, 65, 80, 73, 32, 115, 116, 97, 114, 116, 105, 110, 103, 32, 110, 101, 120, 116, 32, 109, 111, 110, 116, 104, 46, 32, 73, 110, 32, 111, 116, 104, 101, 114, 32, 110, 101, 119, 115, 44, 32, 71, 111, 111, 103, 108, 101, 32, 97, 99, 113, 117, 105, 114, 101, 100, 32, 68, 101, 101, 112, 77, 105, 110, 100, 32, 99, 111, 109, 112, 101, 116, 105, 116, 111, 114, 32, 65, 110, 116, 104, 114, 111, 112, 105, 99, 32, 102, 111, 114, 32, 36, 50, 48, 32, 98, 105, 108, 108, 105, 111, 110, 44, 32, 109, 97, 114, 107, 105, 110, 103, 32, 116, 104, 101, 32, 108, 97, 114, 103, 101, 115, 116, 32, 65, 73, 32, 97, 99, 113, 117, 105, 115, 105, 116, 105, 111, 110, 32, 105, 110, 32, 104, 105, 115, 116, 111, 114, 121, 46]), // User message
+      outputSchema: {
+        type: new Uint8Array([111, 98, 106, 101, 99, 116]), // "object"
+        properties: {
+          topics: {
+            type: new Uint8Array([97, 114, 114, 97, 121]), // "array"
+            items: {
+              type: new Uint8Array([111, 98, 106, 101, 99, 116]), // "object"
+              properties: {
+                headline: {
+                  type: new Uint8Array([115, 116, 114, 105, 110, 103]), // "string"
+                },
+                content: {
+                  type: new Uint8Array([115, 116, 114, 105, 110, 103]), // "string"
+                },
+                url: {
+                  type: new Uint8Array([115, 116, 114, 105, 110, 103]), // "string"
+                },
+                source: {
+                  type: new Uint8Array([115, 116, 114, 105, 110, 103]), // "string"
+                },
+                date: {
+                  type: new Uint8Array([115, 116, 114, 105, 110, 103]), // "string"
+                },
+              },
+              required: [
+                new Uint8Array([104, 101, 97, 100, 108, 105, 110, 101]), // "headline"
+                new Uint8Array([99, 111, 110, 116, 101, 110, 116]), // "content"
+                new Uint8Array([115, 111, 117, 114, 99, 101]), // "source"
+                new Uint8Array([100, 97, 116, 101]), // "date"
+              ],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: [
+          new Uint8Array([116, 111, 112, 105, 99, 115]), // "topics"
+        ],
+        additionalProperties: false,
+      },
+    },
+  ],
+};
+
+// Test the issue: outputSchema should be converted from Uint8Array to proper object
+console.log("Testing parseFromLua with Uint8Array values in outputSchema...");
+
+try {
+  const result = schema.parseFromLua(luaData);
+  console.log("✅ parseFromLua succeeded");
+  console.log("Result messages[1].outputSchema:", result.messages[1].outputSchema);
+  
+  // Check if outputSchema is properly converted
+  if (result.messages[1].outputSchema) {
+    console.log("✅ outputSchema exists");
+    console.log("outputSchema.type:", result.messages[1].outputSchema.type);
+    console.log("outputSchema.properties.topics.type:", result.messages[1].outputSchema.properties?.topics?.type);
+    console.log("outputSchema.required:", result.messages[1].outputSchema.required);
+    
+    // Check if the values are properly converted from Uint8Array to strings
+    const isProperlyConverted = 
+      result.messages[1].outputSchema.type === "object" &&
+      result.messages[1].outputSchema.properties?.topics?.type === "array" &&
+      result.messages[1].outputSchema.properties?.topics?.items?.properties?.headline?.type === "string" &&
+      Array.isArray(result.messages[1].outputSchema.required) &&
+      result.messages[1].outputSchema.required.includes("topics");
+    
+    if (isProperlyConverted) {
+      console.log("✅ All Uint8Array values properly converted to strings");
+    } else {
+      console.log("❌ Uint8Array values not properly converted");
+      console.log("Expected: string values, got:", {
+        type: typeof result.messages[1].outputSchema.type,
+        topicsType: typeof result.messages[1].outputSchema.properties?.topics?.type,
+        headlineType: typeof result.messages[1].outputSchema.properties?.topics?.items?.properties?.headline?.type,
+        required: result.messages[1].outputSchema.required
+      });
+    }
+  } else {
+    console.log("❌ outputSchema is undefined - this is the bug!");
+  }
+} catch (error) {
+  console.log("❌ parseFromLua failed:", error);
+}
+
+// Also test safeParseFromLua
+console.log("\nTesting safeParseFromLua...");
+try {
+  const result = schema.safeParseFromLua(luaData);
+  if (result.success) {
+    console.log("✅ safeParseFromLua succeeded");
+    console.log("Result messages[1].outputSchema:", result.data.messages[1].outputSchema);
+  } else {
+    console.log("❌ safeParseFromLua failed:", result.error);
+  }
+} catch (error) {
+  console.log("❌ safeParseFromLua threw error:", error);
+}

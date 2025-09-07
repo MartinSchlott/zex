@@ -269,7 +269,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.2.0`.
+Current: `0.2.2`.
 
 ## Built with AI in One Day
 

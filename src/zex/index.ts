@@ -231,10 +231,19 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
       const pathString = buildPathString(path, root);
       throw new Error(`fromJsonSchema: Array schema missing 'items' at path '${pathString}'. Add 'items' property with the schema for array elements.`);
     }
-    // PATCH: Wenn items.anyOf vorhanden ist, baue ein Union-Schema als itemSchema
+    // PATCH: Wenn items.anyOf vorhanden ist, baue wahlweise ein DiscriminatedUnion (bei Discriminator)
+    //        oder ein Union-Schema als itemSchema
     let itemSchema: ZexBase<any>;
     if (schema.items && Array.isArray(schema.items.anyOf)) {
-      itemSchema = zex.union(...schema.items.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)));
+      const variants = schema.items.anyOf.map((s: any, i: number) => 
+        fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)
+      );
+      const disc = (schema.items as any).discriminator;
+      if (disc && typeof disc === 'object' && typeof disc.propertyName === 'string') {
+        itemSchema = (zex as any).discriminatedUnion(disc.propertyName, ...(variants as any));
+      } else {
+        itemSchema = zex.union(...(variants as any));
+      }
     } else if (schema.items === true) {
       // Boolean true items means any
       itemSchema = zex.any();
