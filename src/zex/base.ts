@@ -385,4 +385,40 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
   }
 }
 
+// Runtime-only lazy wrapper (Phase 1)
+export class ZexLazy<T> extends ZexBase<T> {
+  constructor(private readonly getSchema: () => ZexBase<T>, config?: Partial<ZexConfig>) {
+    super(config);
+  }
+
+  protected clone(newConfig: ZexConfig): this {
+    return new ZexLazy(this.getSchema, newConfig) as this;
+  }
+
+  private inner(): ZexBase<T> {
+    const schema = this.getSchema();
+    if (!schema) {
+      throw new Error('zex.lazy(): resolver returned falsy schema');
+    }
+    return schema as ZexBase<T>;
+  }
+
+  protected getBaseJsonSchema(): JsonSchema {
+    // Phase 1: emit permissive placeholder so object/array parents can export
+    return {};
+  }
+
+  protected transformLua(data: unknown): unknown {
+    return (this.inner() as any).transformLua(data);
+  }
+
+  protected validateType(data: unknown): { success: true } | { success: false; error: string } {
+    return (this.inner() as any).validateType(data);
+  }
+
+  protected _parse(data: unknown, path: PathEntry[]): T {
+    return (this.inner() as any)._parse(data, path);
+  }
+}
+
  

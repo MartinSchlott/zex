@@ -2,7 +2,7 @@
 // =============================================================================
 
 import { JsonSchema } from './types.js';
-import { ZexBase } from './base.js';
+import { ZexBase, ZexLazy } from './base.js';
 import { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue, ZexJson } from './basic-types.js';
 import { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types.js';
 import { ZexLiteral } from './literal.js';
@@ -30,6 +30,8 @@ export const zex = {
   tuple: <T extends readonly ZexBase<any, any>[]>(schemas: T) => new ZexTuple(schemas),
   union: <T extends readonly ZexBase<any, any>[]>(...schemas: T) => new ZexUnion(schemas),
   literal: <T>(value: T) => new ZexLiteral(value),
+  // Phase 1: runtime-only lazy (no JSON Schema export)
+  lazy: <T>(getSchema: () => ZexBase<T>) => new ZexLazy(getSchema),
   discriminatedUnion: <
     K extends string,
     T extends readonly ZexObject<Record<string, ZexBase<any, any>>>[]
