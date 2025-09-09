@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.4] - 2025-01-27
+
+### Added
+- JSON Schema $defs/$ref Export (Phase 2)
+  - Export-Registry erstellt stabile Einträge in `$defs` und verweist per `$ref`
+  - Unterstützt rekursive/lazy Strukturen ohne Inline-Duplikate
+
+### Fixed
+- JSON Schema $ref Import-Resolver
+  - `fromJsonSchema` löst lokale `$defs`-Referenzen auf, mit Memoisierung und Lazy-Platzhaltern für Zyklen
+  - Discriminated Unions in geschachtelten Positionen bleiben erhalten
+
+### Tests
+- Neuer Lazy-Display Roundtrip-Test prüft $defs/$ref Nutzung und erfolgreiche Re-Import-Validierung
+
 ## [0.2.3] - 2025-01-27
 
 ### Changed

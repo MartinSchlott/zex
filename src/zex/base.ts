@@ -328,6 +328,9 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
 
   // JSON Schema generation
   toJsonSchema(options?: { additionalProperties?: boolean; $schema?: string }): JsonSchema {
+    const isRoot = currentExportCtx === null;
+    if (isRoot) beginExportCtx();
+
     const baseSchema = this.getBaseJsonSchema();
     
     // Sammle und verbinde die JSON-Schema-Eigenschaften der Validatoren
@@ -338,7 +341,7 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     // Verbinde alle Validator-Eigenschaften (letzter gewinnt bei Konflikten)
     const mergedValidators = Object.assign({}, ...validatorSchemas);
     
-    const schema: JsonSchema = {
+    let schema: JsonSchema = {
       ...baseSchema,
       ...mergedValidators,
       ...this.config.meta // Meta-Daten haben die höchste Priorität
@@ -353,8 +356,21 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
       schema.additionalProperties = options.additionalProperties;
     }
 
-    if (options?.$schema) {
-      schema.$schema = options.$schema;
+    if (isRoot) {
+      // finalize deferred defs
+      const pending = currentExportCtx!.unresolved.splice(0);
+      for (const { id, finalize } of pending) {
+        currentExportCtx!.defs[id] = finalize();
+      }
+      // Attach $schema and $defs at root
+      if (options?.$schema) {
+        (schema as any).$schema = options.$schema;
+      }
+      const defs = currentExportCtx!.defs;
+      if (Object.keys(defs).length > 0) {
+        (schema as any).$defs = defs;
+      }
+      endExportCtx();
     }
 
     return schema;
@@ -385,6 +401,39 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
   }
 }
 
+// -----------------------------
+// Export context for $defs/$ref
+// -----------------------------
+type ExportCtx = {
+  defs: Record<string, JsonSchema>;
+  ids: WeakMap<object, string>;
+  seq: number;
+  unresolved: Array<{ id: string; finalize: () => JsonSchema }>;
+  idFor: (obj: object) => string;
+};
+
+let currentExportCtx: ExportCtx | null = null;
+
+function beginExportCtx() {
+  currentExportCtx = {
+    defs: {},
+    ids: new WeakMap<object, string>(),
+    seq: 0,
+    unresolved: [],
+    idFor(obj: object) {
+      const existing = this.ids.get(obj);
+      if (existing) return existing;
+      const id = `S${++this.seq}`;
+      this.ids.set(obj, id);
+      return id;
+    }
+  };
+}
+
+function endExportCtx() {
+  currentExportCtx = null;
+}
+
 // Runtime-only lazy wrapper (Phase 1)
 export class ZexLazy<T> extends ZexBase<T> {
   constructor(private readonly getSchema: () => ZexBase<T>, config?: Partial<ZexConfig>) {
@@ -404,8 +453,19 @@ export class ZexLazy<T> extends ZexBase<T> {
   }
 
   protected getBaseJsonSchema(): JsonSchema {
-    // Phase 1: emit permissive placeholder so object/array parents can export
-    return {};
+    // Phase 2: register a $defs entry and return a $ref
+    if (!currentExportCtx) return {};
+    const id = currentExportCtx.idFor(this);
+    if (!currentExportCtx.defs[id]) {
+      // define placeholder first to break cycles
+      currentExportCtx.defs[id] = {};
+      // defer finalization to avoid immediate recursion
+      currentExportCtx.unresolved.push({
+        id,
+        finalize: () => (this.inner() as any).toJsonSchema()
+      });
+    }
+    return { $ref: `#/$defs/${id}` } as any;
   }
 
   protected transformLua(data: unknown): unknown {

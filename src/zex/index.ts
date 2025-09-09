@@ -104,7 +104,9 @@ function isMetaOnlySchema(schema: any): boolean {
   return keys.length > 0 && !keys.some(k => structuralKeys.includes(k));
 }
 
-function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string): ZexBase<any> {
+type ImportCtx = { defs: Record<string, any>; memo: Map<string, ZexBase<any>> };
+
+function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], root?: string, ctx?: ImportCtx): ZexBase<any> {
   // Support boolean schemas: true means "accept anything"
   if (schema === true) {
     return zex.any();
@@ -114,6 +116,31 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     const schemaType = typeof schema;
     const schemaValue = schema === null ? ' (null)' : '';
     throw new Error(`fromJsonSchema: Invalid schema at path '${pathString}' - schema is ${schemaType}${schemaValue}. Expected a valid JSON Schema object.`);
+  }
+
+  // Handle $ref to local $defs (Draft 2020-12)
+  if (typeof (schema as any).$ref === 'string') {
+    if (!ctx) throw new Error(`fromJsonSchema: $ref found without context at '${buildPathString(path, root)}'`);
+    const ref: string = (schema as any).$ref;
+    const prefix = '#/$defs/';
+    if (!ref.startsWith(prefix)) {
+      throw new Error(`fromJsonSchema: Only local $defs refs supported, got '${ref}' at '${buildPathString(path, root)}'`);
+    }
+    const id = ref.slice(prefix.length);
+    const cached = ctx.memo.get(id);
+    if (cached) return cached;
+    // Create lazy placeholder that resolves on demand
+    const lazy = (zex as any).lazy(() => {
+      const again = ctx.memo.get(id);
+      if (again && again !== lazy) return again;
+      const target = ctx.defs[id];
+      if (!target) throw new Error(`fromJsonSchema: Missing $defs['${id}']`);
+      const resolved = fromJsonSchemaInternal(target, ['$', 'defs', id], root, ctx);
+      ctx.memo.set(id, resolved);
+      return resolved;
+    });
+    ctx.memo.set(id, lazy);
+    return lazy;
   }
 
   // Meta-Felder extrahieren
@@ -224,7 +251,7 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     // Check for tuple (fixed-length array with prefixItems)
     if (schema.prefixItems && Array.isArray(schema.prefixItems)) {
       const tupleSchemas = schema.prefixItems.map((itemSchema: any, i: number) => 
-        fromJsonSchemaInternal(itemSchema, [...path, `prefixItems[${i}]`], root)
+        fromJsonSchemaInternal(itemSchema, [...path, `prefixItems[${i}]`], root, ctx)
       );
       return zex.tuple(tupleSchemas).meta(meta) as ZexBase<any>;
     }
@@ -238,7 +265,7 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     let itemSchema: ZexBase<any>;
     if (schema.items && Array.isArray(schema.items.anyOf)) {
       const variants = schema.items.anyOf.map((s: any, i: number) => 
-        fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root)
+        fromJsonSchemaInternal(s, [...path, `items.anyOf[${i}]`], root, ctx)
       );
       const disc = (schema.items as any).discriminator;
       if (disc && typeof disc === 'object' && typeof disc.propertyName === 'string') {
@@ -253,7 +280,7 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
       // Empty items object means any type
       itemSchema = zex.any();
     } else {
-      itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root);
+      itemSchema = fromJsonSchemaInternal(schema.items, [...path, "items"], root, ctx);
     }
     const arr = zex.array(itemSchema).meta(meta) as ZexBase<any>;
     return arr;
@@ -271,7 +298,8 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
       const valueSchema = fromJsonSchemaInternal(
         schema.additionalProperties || {}, // Fallback to empty object -> zex.any()
         [...path, "additionalProperties"], 
-        root
+        root,
+        ctx
       );
       return zex.record(valueSchema).meta(meta) as ZexBase<any>;
     }
@@ -288,7 +316,7 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     // Handle objects with or without properties
     if (schema.properties && typeof schema.properties === "object") {
       for (const [key, propSchema] of Object.entries(schema.properties)) {
-        let z = fromJsonSchemaInternal(propSchema, [...path, key], root);
+        let z = fromJsonSchemaInternal(propSchema, [...path, key], root, ctx);
         if (!required.includes(key)) z = z.optional();
         shape[key] = z;
       }
@@ -327,12 +355,12 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     const discriminator = (schema as any).discriminator;
     if (discriminator && typeof discriminator === 'object' && typeof discriminator.propertyName === 'string') {
       const key = discriminator.propertyName as string;
-      const reconstructedVariants = (schema.anyOf as any[]).map((v, i) => fromJsonSchemaInternal(v, [...path, `anyOf[${i}]`], root)) as any[];
+      const reconstructedVariants = (schema.anyOf as any[]).map((v, i) => fromJsonSchemaInternal(v, [...path, `anyOf[${i}]`], root, ctx)) as any[];
       return (zex as any).discriminatedUnion(key, ...reconstructedVariants).meta(meta) as ZexBase<any>;
     }
     
     // Fallback: regular union (no discriminator detection)
-    return zex.union(...(schema.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `anyOf[${i}]`], root)))).meta(meta) as ZexBase<any>;
+    return zex.union(...(schema.anyOf.map((s: any, i: number) => fromJsonSchemaInternal(s, [...path, `anyOf[${i}]`], root, ctx)))).meta(meta) as ZexBase<any>;
   }
 
   // Handle const values (literals)
@@ -360,12 +388,14 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
 
 // Public functions
 function fromJsonSchema(schema: any, options?: { rootName?: string }): ZexBase<any> {
-  return fromJsonSchemaInternal(schema, [], options?.rootName);
+  const defs = (schema && typeof schema === 'object' && (schema as any).$defs) || {};
+  const ctx: ImportCtx = { defs, memo: new Map() };
+  return fromJsonSchemaInternal(schema, [], options?.rootName, ctx);
 }
 
 function safeFromJsonSchema(schema: any, options?: { rootName?: string }): { success: true; schema: ZexBase<any> } | { success: false; error: string } {
   try {
-    const z = fromJsonSchemaInternal(schema, [], options?.rootName);
+    const z = fromJsonSchema(schema, options);
     return { success: true, schema: z };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };

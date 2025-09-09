@@ -245,6 +245,18 @@ try {
   const parsed = DisplayPayloadSchema.parse(sample);
   console.log('✅ lazy recursive display parse succeeded');
   console.log('Root view:', Array.isArray(parsed) ? 'array' : (parsed as any).view);
+  // Roundtrip: export -> import -> parse
+  const jsonSchema = DisplayPayloadSchema.toJSONSchema({ $schema: 'https://json-schema.org/draft/2020-12/schema' });
+  // Phase 2 expectation: $defs present and references ($ref) used for recursive parts
+  const hasDefs = !!(jsonSchema as any).$defs;
+  const hasAnyRef = JSON.stringify(jsonSchema).includes('"$ref"');
+  if (!hasDefs || !hasAnyRef) {
+    throw new Error('Expected $defs and $ref usage in exported JSON Schema for lazy recursion');
+  }
+  const recreated = zex.fromJsonSchema(jsonSchema);
+  const roundParsed = recreated.parse(sample);
+  console.log('✅ lazy display roundtrip parse succeeded');
+  console.log('Roundtrip root view:', Array.isArray(roundParsed) ? 'array' : (roundParsed as any).view);
 } catch (e) {
   console.error('❌ lazy recursive display parse failed', e);
 }
