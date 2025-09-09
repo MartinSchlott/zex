@@ -136,25 +136,64 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
     public shape: T,
     config?: Partial<ZexConfig>,
     private allowAdditionalProperties: boolean = false,
-    private mode: ZexObjectMode = "strict"
+    private mode: ZexObjectMode = "strict",
+    private allOptional: boolean = false
   ) {
     super(config);
   }
 
   passthrough(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, true, "passthrough");
+    return new ZexObject(this.shape, this.config, true, "passthrough", this.allOptional);
   }
 
   strip(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, true, "strip");
+    return new ZexObject(this.shape, this.config, true, "strip", this.allOptional);
   }
 
   strict(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, false, "strict");
+    return new ZexObject(this.shape, this.config, false, "strict", this.allOptional);
   }
 
   protected clone(newConfig: ZexConfig): this {
-    return new ZexObject(this.shape, newConfig, this.allowAdditionalProperties, this.mode) as this;
+    return new ZexObject(this.shape, newConfig, this.allowAdditionalProperties, this.mode, this.allOptional) as this;
+  }
+
+  // Shallow: make all top-level fields optional. Defaults only apply when explicitly provided as undefined.
+  partial(): ZexObject<T> {
+    return new ZexObject(this.shape, this.config, this.allowAdditionalProperties, this.mode, true);
+  }
+
+  // Remove selected top-level keys from the schema. Unknown handling is governed by object mode.
+  omit(...keys: (string | string[])[]): ZexObject<Partial<T> & Record<string, ZexBase<any, any>>> {
+    const flat: string[] = [];
+    for (const k of keys) {
+      if (Array.isArray(k)) flat.push(...k);
+      else flat.push(k);
+    }
+    const toOmit = new Set(flat);
+    const newShape: Record<string, ZexBase<any, any>> = {};
+    for (const [key, schema] of Object.entries(this.shape)) {
+      if (!toOmit.has(key)) newShape[key] = schema;
+    }
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
+  }
+
+  // Remove properties with readOnly: true
+  omitReadOnly(): ZexObject<Partial<T> & Record<string, ZexBase<any, any>>> {
+    const newShape: Record<string, ZexBase<any, any>> = {};
+    for (const [key, schema] of Object.entries(this.shape)) {
+      if (!(schema as any).isReadOnly()) newShape[key] = schema;
+    }
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
+  }
+
+  // Remove properties with writeOnly: true
+  omitWriteOnly(): ZexObject<Partial<T> & Record<string, ZexBase<any, any>>> {
+    const newShape: Record<string, ZexBase<any, any>> = {};
+    for (const [key, schema] of Object.entries(this.shape)) {
+      if (!(schema as any).isWriteOnly()) newShape[key] = schema;
+    }
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
   }
 
   protected getBaseJsonSchema(): JsonSchema {
@@ -162,7 +201,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
     const required: string[] = [];
     for (const [key, schema] of Object.entries(this.shape)) {
       properties[key] = schema.toJsonSchema();
-      if (!(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
+      if (!this.allOptional && !(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         required.push(key);
       }
     }
@@ -202,7 +241,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
             // default will apply in _parse
             continue;
           }
-          if ((schema as any).config?.optional) {
+          if (this.allOptional || (schema as any).config?.optional) {
             // optional undefined is fine
             continue;
           }
@@ -213,7 +252,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         if (!result.success) {
           return { success: false, error: `Field '${key}': ${result.error}` };
         }
-      } else if (!(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
+      } else if (!this.allOptional && !(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         return { success: false, error: `Missing required field '${key}'` };
       }
     }
@@ -261,13 +300,13 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         }];
         const value = (validatedData as any)[key];
         if (value === undefined) {
-          if ((schema as any).config?.optional) {
-            // Omit missing optional keys entirely
+          if ((schema as any).config?.defaultValue !== undefined) {
+            // Trigger default when explicitly provided as undefined
+            result[key] = (schema as any)._parse(undefined, fieldPath);
             continue;
           }
-          if ((schema as any).config?.defaultValue !== undefined) {
-            // Trigger default by parsing undefined
-            result[key] = (schema as any)._parse(undefined, fieldPath);
+          if (this.allOptional || (schema as any).config?.optional) {
+            // Omit missing optional keys entirely
             continue;
           }
           // Required without default: error
@@ -280,7 +319,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
           );
         }
         result[key] = (schema as any)._parse(value, fieldPath);
-      } else if (!(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
+      } else if (!this.allOptional && !(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         // Missing required field - throw structured error
         throw new ZexError(
           path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
@@ -291,7 +330,7 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         );
       } else {
         // Field is optional or has default - apply default if present
-        if ((schema as any).config?.optional) {
+        if (this.allOptional || (schema as any).config?.optional) {
           // Omit entirely for optionals
           // no-op
         } else {

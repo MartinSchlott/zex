@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.6] - 2025-01-27
+
+### Added
+- Object utilities:
+  - `object.partial()` makes all top-level fields optional (shallow)
+  - `object.omit(...keys)` removes specified top-level properties; unknown handling follows object mode (strict/strip/passthrough)
+  - `object.omitReadOnly()` removes properties marked with `readOnly: true`
+  - `object.omitWriteOnly()` removes properties marked with `writeOnly: true`
+
+### Fixed
+- `safeParseFromLua` now respects object modes for unknown keys in strict/strip/passthrough consistently (no silent stripping in strict)
+
+### Notes
+- All new methods are immutable and chainable; JSON Schema export/roundtrip reflects required changes and property removals
+
 ## [0.2.5] - 2025-01-27
 
 ### Fixed

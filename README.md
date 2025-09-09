@@ -32,8 +32,14 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **TypeScript-first**: Excellent type inference and IDE support
 - ✅ **Extensible**: Easy to add custom validators and types
 - ✅ **Discriminated Unions**: First-class `discriminatedUnion()` with clean types and JSON Schema export
+- ✅ **Object Utilities**: `object.partial()`, `object.omit(...)`, `omitReadOnly()`, `omitWriteOnly()` for ergonomic object shaping
 - ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
 - ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
+
+## What's New in 0.2.6
+
+- 🧩 **Object utilities**: `object.partial()` (shallow all-optional), `object.omit(...keys)`, `omitReadOnly()`, `omitWriteOnly()`
+- 🧱 **Strictness parity**: `safeParseFromLua` now enforces strict/strip/passthrough like normal parse
 
 ## What's New in 0.2.0
 
@@ -257,6 +263,34 @@ Note: `zex.number()` is finite-only; it rejects `NaN`, `Infinity`, and `-Infinit
 - `.passthrough()` - Allow unknown properties
 - `.strip()` - Remove unknown properties
 
+### Object Utilities
+```typescript
+const base = zex.object({
+  a: zex.string(),
+  b: zex.number(),
+  c: zex.string().default('C'),
+  r: zex.string().readOnly(),
+  w: zex.string().writeOnly(),
+});
+
+// Make all top-level fields optional (shallow); defaults still apply when explicitly undefined
+const Part = (base as any).partial();
+Part.parse({}); // ok, { }
+Part.parse({ c: undefined }); // ok, default 'C'
+
+// Remove keys; unknown handling follows object mode
+const NoB = (base as any).omit('b');
+NoB.strict().parse({ a: 'x', b: 1 }); // ❌ unknown 'b'
+NoB.strip().parse({ a: 'x', b: 1 });  // ✅ { a: 'x' }
+NoB.passthrough().parse({ a: 'x', b: 1 }); // ✅ keeps b
+
+// Remove by access intent annotations
+const NoRO = (base as any).omitReadOnly();   // drops r
+const NoWO = (base as any).omitWriteOnly();  // drops w
+
+// JSON Schema export reflects required and properties; roundtrip preserved
+```
+
 ## Not a Drop-in Replacement
 
 Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes (e.g., `union(...schemas)` statt `union([schemas])`, strict by default), but the improved type safety and clearer errors make it worth it.
@@ -269,7 +303,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.2.5`.
+Current: `0.2.6`.
 
 ## Built with AI in One Day
 
