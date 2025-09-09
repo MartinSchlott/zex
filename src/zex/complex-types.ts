@@ -176,9 +176,10 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
 
   protected transformLua(data: unknown): unknown {
     if (typeof data !== 'object' || data === null) return data;
-    const result: Record<string, unknown> = {};
+    // Preserve unknown keys so object mode (strict/strip/passthrough) is enforced at parse stage
+    const result: Record<string, unknown> = { ...(data as any) };
     for (const [key, schema] of Object.entries(this.shape)) {
-      if (key in data) {
+      if (key in (data as any)) {
         result[key] = (schema as any).transformLua((data as any)[key]);
       }
     }

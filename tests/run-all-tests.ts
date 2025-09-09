@@ -45,6 +45,7 @@ await runImport('./behavior/discriminator-export-test.test.ts');
 await runImport('./behavior/llm-roundtrip-lua.test.ts');
 await runImport('./behavior/optional-omission.test.ts');
 await runImport('./behavior/lazy-display.test.ts');
+await runImport('./behavior/strict-vs-strip-lua.test.ts');
 
 // JSON Schema
 await runImport('./jsonschema/to-from-roundtrip.test.ts');
