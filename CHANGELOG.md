@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.5] - 2025-01-27
+
+### Fixed
+- Enum Lua-Byte-Strings werden jetzt korrekt zu UTF-8 Strings decodiert
+  - `ZexEnum.transformLua` dekodiert `Uint8Array`/Buffer/ArrayBuffer und byte-ähnliche Objekte
+  - Behebt `safeParseFromLua`-Fehler bei Enums in zusammengesetzten Strukturen (z. B. Display-Status)
+
 ## [0.2.4] - 2025-01-27
 
 ### Added

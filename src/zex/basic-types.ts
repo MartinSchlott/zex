@@ -305,6 +305,37 @@ export class ZexEnum<T extends readonly unknown[], TFlags extends Record<string,
   }
 
   protected transformLua(data: unknown): unknown {
+    // Decode common byte representations to UTF-8 strings so enum matching works from Lua
+    try {
+      if (data instanceof Uint8Array) {
+        return new TextDecoder('utf-8', { fatal: true }).decode(data);
+      }
+      if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+        return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(data));
+      }
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
+        return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(data as unknown as Buffer));
+      }
+      if (data && typeof data === 'object') {
+        const obj: any = data;
+        if ((obj.type === 'Buffer' || obj._type === 'Buffer') && Array.isArray(obj.data)) {
+          const u8 = Uint8Array.from(obj.data as number[]);
+          return new TextDecoder('utf-8', { fatal: true }).decode(u8);
+        }
+        // zero-based byte-like object {"0":..., "1":...}
+        const keys = Object.keys(obj);
+        if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+          const ints = keys.map(k => parseInt(k, 10)).sort((a, b) => a - b);
+          let contiguousZero = true;
+          for (let i = 0; i < ints.length; i++) if (ints[i] !== i) { contiguousZero = false; break; }
+          if (contiguousZero) {
+            const arr = new Uint8Array(ints.length);
+            for (let i = 0; i < ints.length; i++) arr[i] = obj[String(i)] as number;
+            return new TextDecoder('utf-8', { fatal: true }).decode(arr);
+          }
+        }
+      }
+    } catch {}
     return data;
   }
 

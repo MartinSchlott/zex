@@ -357,12 +357,7 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     }
 
     if (isRoot) {
-      // finalize deferred defs
-      const pending = currentExportCtx!.unresolved.splice(0);
-      for (const { id, finalize } of pending) {
-        currentExportCtx!.defs[id] = finalize();
-      }
-      // Attach $schema and $defs at root
+      // Attach $schema and $defs at root (lazy defs may remain placeholders)
       if (options?.$schema) {
         (schema as any).$schema = options.$schema;
       }

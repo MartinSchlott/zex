@@ -260,3 +260,25 @@ try {
 } catch (e) {
   console.error('❌ lazy recursive display parse failed', e);
 }
+
+// Lua-style enum as Uint8Array in metric.status
+const luaSample = {
+  view: 'columns',
+  items: [
+    { view: 'metric', label: 'Operation', value: 'upper', id: 'current-operation' },
+    {
+      view: 'metric',
+      label: 'Status',
+      value: 'Complete',
+      status: new Uint8Array([111, 107]) // "ok"
+    }
+  ]
+};
+
+try {
+  const s1 = DisplayElementLazy; // ensure symbol is used
+  const parsedLua = DisplayPayloadSchema.parseFromLua([luaSample]);
+  console.log('✅ lazy display safeParseFromLua with enum bytes succeeded');
+} catch (e) {
+  console.error('❌ lazy display safeParseFromLua with enum bytes failed', e);
+}
