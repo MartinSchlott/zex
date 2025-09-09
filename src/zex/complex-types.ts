@@ -137,25 +137,30 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
     config?: Partial<ZexConfig>,
     private allowAdditionalProperties: boolean = false,
     private mode: ZexObjectMode = "strict",
-    private allOptional: boolean = false
+    private allOptional: boolean = false,
+    private prestripKeys?: Set<string>,
+    private prestripByReadOnly: boolean = false,
+    private prestripByWriteOnly: boolean = false,
+    private removedReadOnlyKeys?: Set<string>,
+    private removedWriteOnlyKeys?: Set<string>
   ) {
     super(config);
   }
 
   passthrough(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, true, "passthrough", this.allOptional);
+    return new ZexObject(this.shape, this.config, true, "passthrough", this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
   }
 
   strip(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, true, "strip", this.allOptional);
+    return new ZexObject(this.shape, this.config, true, "strip", this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
   }
 
   strict(): ZexObject<T> {
-    return new ZexObject(this.shape, this.config, false, "strict", this.allOptional);
+    return new ZexObject(this.shape, this.config, false, "strict", this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
   }
 
   protected clone(newConfig: ZexConfig): this {
-    return new ZexObject(this.shape, newConfig, this.allowAdditionalProperties, this.mode, this.allOptional) as this;
+    return new ZexObject(this.shape, newConfig, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys) as this;
   }
 
   // Shallow: make all top-level fields optional. Defaults only apply when explicitly provided as undefined.
@@ -175,25 +180,57 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
     for (const [key, schema] of Object.entries(this.shape)) {
       if (!toOmit.has(key)) newShape[key] = schema;
     }
-    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
   }
 
   // Remove properties with readOnly: true
   omitReadOnly(): ZexObject<Partial<T> & Record<string, ZexBase<any, any>>> {
     const newShape: Record<string, ZexBase<any, any>> = {};
+    const removed = new Set<string>();
     for (const [key, schema] of Object.entries(this.shape)) {
-      if (!(schema as any).isReadOnly()) newShape[key] = schema;
+      if ((schema as any).isReadOnly()) {
+        removed.add(key);
+      } else {
+        newShape[key] = schema;
+      }
     }
-    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
+    const mergedRemoved = new Set([...(this.removedReadOnlyKeys || new Set<string>()), ...removed]);
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, mergedRemoved, this.removedWriteOnlyKeys);
   }
 
   // Remove properties with writeOnly: true
   omitWriteOnly(): ZexObject<Partial<T> & Record<string, ZexBase<any, any>>> {
     const newShape: Record<string, ZexBase<any, any>> = {};
+    const removed = new Set<string>();
     for (const [key, schema] of Object.entries(this.shape)) {
-      if (!(schema as any).isWriteOnly()) newShape[key] = schema;
+      if ((schema as any).isWriteOnly()) {
+        removed.add(key);
+      } else {
+        newShape[key] = schema;
+      }
     }
-    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional);
+    const mergedRemoved = new Set([...(this.removedWriteOnlyKeys || new Set<string>()), ...removed]);
+    return new ZexObject(newShape as any, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, mergedRemoved);
+  }
+
+  // Targeted runtime-only stripping: remove only specified keys from input before validation
+  stripOnly(...keys: (string | string[])[]): ZexObject<T> {
+    const flat: string[] = [];
+    for (const k of keys) {
+      if (Array.isArray(k)) flat.push(...k);
+      else flat.push(k);
+    }
+    const union = new Set([...(this.prestripKeys || new Set<string>()), ...flat]);
+    return new ZexObject(this.shape, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, union, this.prestripByReadOnly, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
+  }
+
+  // Targeted runtime-only stripping by meta flags
+  stripReadOnly(): ZexObject<T> {
+    return new ZexObject(this.shape, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, true, this.prestripByWriteOnly, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
+  }
+
+  stripWriteOnly(): ZexObject<T> {
+    return new ZexObject(this.shape, this.config, this.allowAdditionalProperties, this.mode, this.allOptional, this.prestripKeys, this.prestripByReadOnly, true, this.removedReadOnlyKeys, this.removedWriteOnlyKeys);
   }
 
   protected getBaseJsonSchema(): JsonSchema {
@@ -268,7 +305,38 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
   }
 
   protected _parse(data: unknown, path: PathEntry[]): InferObjectType<T> {
-    const validatedData = super._parse(data, path) as Record<string, unknown>;
+    const incoming = super._parse(data, path) as Record<string, unknown>;
+    // Targeted pre-strip selected keys from input before unknown-property checks
+    const validatedData: Record<string, unknown> = { ...incoming };
+    if (validatedData && typeof validatedData === 'object') {
+      if (this.prestripKeys && this.prestripKeys.size > 0) {
+        for (const k of this.prestripKeys) {
+          if (k in validatedData) delete (validatedData as any)[k];
+        }
+      }
+      if (this.prestripByReadOnly || this.prestripByWriteOnly) {
+        // Drop keys that were removed from shape due to readOnly/writeOnly omission
+        if (this.prestripByReadOnly && this.removedReadOnlyKeys && this.removedReadOnlyKeys.size > 0) {
+          for (const k of this.removedReadOnlyKeys) {
+            if (k in validatedData) delete (validatedData as any)[k];
+          }
+        }
+        if (this.prestripByWriteOnly && this.removedWriteOnlyKeys && this.removedWriteOnlyKeys.size > 0) {
+          for (const k of this.removedWriteOnlyKeys) {
+            if (k in validatedData) delete (validatedData as any)[k];
+          }
+        }
+        for (const [key, schema] of Object.entries(this.shape)) {
+          if (this.prestripByReadOnly && (schema as any).isReadOnly()) {
+            if (key in validatedData) delete (validatedData as any)[key];
+            continue;
+          }
+          if (this.prestripByWriteOnly && (schema as any).isWriteOnly()) {
+            if (key in validatedData) delete (validatedData as any)[key];
+          }
+        }
+      }
+    }
 
     // --- STRICT MODE: Check for unknown properties (only if not allowing additional properties) ---
     if (this.mode === "strict") {

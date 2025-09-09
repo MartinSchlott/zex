@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.7] - 2025-01-27
+
+### Added
+- Targeted strip helpers on objects (runtime-only, preserve strictness for others):
+  - `object.stripOnly(...keys)` drops only these keys from input before validation
+  - `object.stripReadOnly()` drops only fields marked `readOnly: true`
+  - `object.stripWriteOnly()` drops only fields marked `writeOnly: true`
+
+### Guidance
+- Prefer `strict().stripOnly('uid')` for selectively dropping known keys while keeping typo detection
+- For writeOnly fields: make them optional (or use `partial()`) and use `stripWriteOnly()` when present
+- Avoid `omitWriteOnly().stripWriteOnly()` unless you intentionally accept removed writeOnly keys
+
 ## [0.2.6] - 2025-01-27
 
 ### Added

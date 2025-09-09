@@ -1,6 +1,6 @@
 {
   "name": "@ai-inquisitor/zex",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

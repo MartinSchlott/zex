@@ -36,6 +36,11 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
 - ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
 
+## What's New in 0.2.7
+
+- 🎯 **Targeted strip**: `object.stripOnly(...keys)`, `stripReadOnly()`, `stripWriteOnly()`
+- Keep `.strict()` for typo detection and drop only specific keys or access-intent fields at runtime
+
 ## What's New in 0.2.6
 
 - 🧩 **Object utilities**: `object.partial()` (shallow all-optional), `object.omit(...keys)`, `omitReadOnly()`, `omitWriteOnly()`
@@ -291,6 +296,22 @@ const NoWO = (base as any).omitWriteOnly();  // drops w
 // JSON Schema export reflects required and properties; roundtrip preserved
 ```
 
+### Targeted Strip (runtime-only)
+```typescript
+// Drop only specific keys from input, keep strict for typos
+const S1 = (base as any).omit('uid').strict().stripOnly('uid');
+S1.parse({ a: 'x', uid: 'U-1' }); // ok, 'uid' stripped; other unknowns still error
+
+// Drop writeOnly fields when present, without weakening strict mode for others
+const S2 = (base as any).partial().stripWriteOnly().strict();
+S2.parse({ a: 'x', w: 'secret' }); // ok, 'w' stripped; typos still error
+
+// Guidance:
+// - Prefer strict + stripOnly('key') for selective dropping while keeping typo detection
+// - For writeOnly: make optional or use partial(), then stripWriteOnly()
+// - Avoid omitWriteOnly().stripWriteOnly() unless you intentionally accept removed keys
+```
+
 ## Not a Drop-in Replacement
 
 Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes (e.g., `union(...schemas)` statt `union([schemas])`, strict by default), but the improved type safety and clearer errors make it worth it.
@@ -303,7 +324,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.2.6`.
+Current: `0.2.7`.
 
 ## Built with AI in One Day
 
