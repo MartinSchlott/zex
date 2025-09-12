@@ -173,6 +173,113 @@ const jsonschemaJson = jsonschemaType.toJSONSchema();
 - String UI hint `.multiline(n?)` exports to `x-ui-multiline` in JSON Schema; omitted when 0. `getMultiline()` returns the number (default 0).
 - Access annotations `.readOnly()` / `.writeOnly()` export JSON Schema `readOnly: true` / `writeOnly: true`. Passing `false` removes the key. Imported `false` values are normalized (dropped). These flags are documentation-only and do not affect parsing/validation.
 
+### Format Features and Metadata
+
+Zex provides comprehensive format support for JSON Schema generation and validation:
+
+#### Manual Format Setting
+```typescript
+// Set custom format for JSON Schema
+const schema = zex.string()
+  .format('date-time')
+  .describe('ISO 8601 timestamp');
+
+// Set MIME type for content
+const textSchema = zex.string()
+  .mimeFormat('text/plain')
+  .describe('Plain text content');
+
+// Combine format and MIME type
+const jsonSchema = zex.string()
+  .format('json')
+  .mimeFormat('application/json')
+  .describe('JSON string');
+```
+
+#### Automatic Format Detection
+Built-in validators automatically set appropriate formats:
+
+```typescript
+// Email validator sets format: 'email'
+const emailSchema = zex.string().email();
+const emailJson = emailSchema.toJSONSchema();
+// Result: { "type": "string", "format": "email" }
+
+// UUID validator sets format: 'uuid'
+const uuidSchema = zex.string().uuid();
+const uuidJson = uuidSchema.toJSONSchema();
+// Result: { "type": "string", "format": "uuid" }
+
+// URI/URL types have built-in formats
+const uriSchema = zex.uri();
+const uriJson = uriSchema.toJSONSchema();
+// Result: { "type": "string", "format": "uri" }
+
+const urlSchema = zex.url();
+const urlJson = urlSchema.toJSONSchema();
+// Result: { "type": "string", "format": "uri-reference" }
+```
+
+#### Buffer Format Support
+Binary data uses a custom format for clear semantics:
+
+```typescript
+// Buffer with MIME type
+const imageSchema = zex.buffer('image/png');
+const imageJson = imageSchema.toJSONSchema();
+// Result: { 
+//   "type": "object", 
+//   "format": "buffer",
+//   "contentMediaType": "image/png" 
+// }
+
+// Buffer without MIME type
+const genericBuffer = zex.buffer();
+const bufferJson = genericBuffer.toJSONSchema();
+// Result: { "type": "object", "format": "buffer" }
+```
+
+#### Record Format
+Record types use a special format marker for perfect roundtrips:
+
+```typescript
+const recordSchema = zex.record(zex.string());
+const recordJson = recordSchema.toJSONSchema();
+// Result: {
+//   "type": "object",
+//   "format": "record",
+//   "additionalProperties": { "type": "string" }
+// }
+```
+
+#### JSON Schema Format Import
+Zex can import and recognize various formats from JSON Schema:
+
+```typescript
+// Import from JSON Schema with format
+const importedSchema = zex.fromJsonSchema({
+  "type": "string",
+  "format": "email"
+});
+// Creates: zex.string().email()
+
+// Import buffer format
+const bufferSchema = zex.fromJsonSchema({
+  "type": "object",
+  "format": "buffer",
+  "contentMediaType": "image/jpeg"
+});
+// Creates: zex.buffer('image/jpeg')
+
+// Import record format
+const recordSchema = zex.fromJsonSchema({
+  "type": "object",
+  "format": "record",
+  "additionalProperties": { "type": "string" }
+});
+// Creates: zex.record(zex.string())
+```
+
 ### Clear Error Messages
 ```typescript
 try {
@@ -224,35 +331,35 @@ const schema = zex.object({
 ## API Overview
 
 ### Basic Types
-- `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`
+- `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`, format support `.format()` and `.mimeFormat()`
 - `zex.number()` - Number validation (finite-only) with `.int()`, `.min()`, `.max()`, `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
 - `zex.boolean()` - Boolean validation
 - `zex.json()` - JSON-serializable data (rejects functions and binary data)
-- `zex.buffer(mimeType?)` - Binary data validation
+- `zex.buffer(mimeType?)` - Binary data validation with automatic `format: "buffer"` and `contentMediaType` support
 - `zex.any()` - Any value (use sparingly)
 - `zex.null()` - Null values only
 
 ### Complex Types
 - `zex.array(schema)` - Array of items
 - `zex.object(shape)` - Object validation (strict by default)
-- `zex.record(valueSchema)` - Key-value records
+- `zex.record(valueSchema)` - Key-value records with automatic `format: "record"` in JSON Schema
 - `zex.tuple([...schemas])` - Fixed-length arrays
 - `zex.union(...schemas)` - One of multiple types (varargs)
 - `zex.literal(value)` - Exact value matching
 - `zex.enum([...values])` - Enumeration
 
 ### Special Types
-- `zex.uri()` - URI validation
-- `zex.url()` - HTTP/HTTPS URL validation
+- `zex.uri()` - URI validation with automatic `format: "uri"` in JSON Schema
+- `zex.url()` - HTTP/HTTPS URL validation with automatic `format: "uri-reference"` in JSON Schema
 
 ### Modifiers
 - `.optional()` - Make field optional
 - `.nullable()` - Allow null values
 - `.default(value)` - Set default value
 - `.describe(text)` - Add description for JSON Schema
-- `.mimeFormat(mime)` - Set `contentMediaType` on JSON Schema
 - `.title(text)` - Set JSON Schema `title`
-- `.format(fmt)` - Set JSON Schema `format`
+- `.format(fmt)` - Set JSON Schema `format` (e.g., 'email', 'uuid', 'date-time')
+- `.mimeFormat(mime)` - Set `contentMediaType` on JSON Schema (e.g., 'text/plain', 'image/png')
 - `.deprecated(flag = true)` - Set JSON Schema `deprecated`
 - `.meta(obj)` - Merge arbitrary metadata into JSON Schema
 - `.readOnly(flag = true)` / `.writeOnly(flag = true)` - Set JSON Schema annotations (documentation-only)
