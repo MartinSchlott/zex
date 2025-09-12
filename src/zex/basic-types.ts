@@ -2,7 +2,7 @@
 // =============================================================================
 
 import { JsonSchema, ZexConfig } from './types.js';
-import { ZexBase } from './base.js';
+import { ZexBase } from './base/index.js';
 import { 
   EmailValidator, 
   UuidValidator, 

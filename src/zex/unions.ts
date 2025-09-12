@@ -2,8 +2,8 @@
 // =============================================================================
 
 import { JsonSchema, PathEntry, ZexConfig, ZexError } from './types.js';
-import { ZexBase } from './base.js';
-import { ZexObject } from './complex-types.js';
+import { ZexBase } from './base/index.js';
+import { ZexObject } from './complex-types/index.js';
 import { decodePossibleUtf8Bytes } from './utils/lua.js';
 
 // =============================================================================
