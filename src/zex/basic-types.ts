@@ -480,7 +480,8 @@ export class ZexJson<TFlags extends Record<string, boolean> = {}> extends ZexBas
   }
 
   protected getBaseJsonSchema(): JsonSchema {
-    return {}; // Same as zex.any() - no constraints
+    // Emit explicit non-standard marker to preserve roundtrip identity
+    return { format: 'json' } as any;
   }
 
   protected transformLua(data: unknown): unknown {

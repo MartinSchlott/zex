@@ -36,24 +36,6 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
 - ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
 
-## What's New in 0.2.7
-
-- 🎯 **Targeted strip**: `object.stripOnly(...keys)`, `stripReadOnly()`, `stripWriteOnly()`
-- Keep `.strict()` for typo detection and drop only specific keys or access-intent fields at runtime
-
-## What's New in 0.2.6
-
-- 🧩 **Object utilities**: `object.partial()` (shallow all-optional), `object.omit(...keys)`, `omitReadOnly()`, `omitWriteOnly()`
-- 🧱 **Strictness parity**: `safeParseFromLua` now enforces strict/strip/passthrough like normal parse
-
-## What's New in 0.2.0
-
-- 🚀 **Explicit Type Markers**: Records and jsonschema types now use `format` markers for perfect roundtrip preservation
-- 🛡️ **Better Error Messages**: Clear guidance when importing unsupported JSON Schema features (`allOf`, `oneOf`, `not`)
-- ⚡ **Performance Improvements**: Meta-only schemas now use early exit pattern
-- 🔧 **Lua Byte-String Decoding**: Fixed parsing of byte arrays in unions and discriminated unions
-- 📋 **JSON Schema Standards**: Discriminated unions now use Draft 2020-12 discriminator format
-
 *See [CHANGELOG.md](./CHANGELOG.md) for full details.*
 
 ## Quick Start
@@ -127,6 +109,9 @@ configSchema.parse({
 // configSchema.parse({ userData: new Uint8Array([1,2,3]) }); // ❌ Error
 ```
 
+- JSON Schema export uses a non-standard marker to preserve intent: `zex.json()` → `{ format: "json" }`.
+- Import preserves the type: `{ format: "json" }` → `zex.json()` (roundtrip-stable).
+
 ### Lua Data Transformation
 ```typescript
 // Lua arrays are 1-indexed objects
@@ -160,6 +145,10 @@ const jsonSchema = recordSchema.toJSONSchema();
 const jsonschemaType = zex.jsonschema();
 const jsonschemaJson = jsonschemaType.toJSONSchema();
 // Exports: { "type": "object", "format": "jsonschema", "description": "JSON Schema object" }
+
+const jsonData = zex.json();
+const jsonDataJson = jsonData.toJSONSchema();
+// Exports: { "format": "json" }
 ```
 
 - Import mapping for number bounds:
@@ -278,6 +267,10 @@ const recordSchema = zex.fromJsonSchema({
   "additionalProperties": { "type": "string" }
 });
 // Creates: zex.record(zex.string())
+
+// Import json marker
+const jsonData = zex.fromJsonSchema({ "format": "json", "description": "Any JSON" });
+// Creates: zex.json().describe('Any JSON')
 ```
 
 ### Clear Error Messages
@@ -431,7 +424,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.2.7`.
+Current: `0.2.8`.
 
 ## Built with AI in One Day
 

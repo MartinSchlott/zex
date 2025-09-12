@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.8] - 2025-09-12
+
+### Added
+- JSON roundtrip marker for `zex.json()`
+  - Export now emits `{ format: "json" }` (non-standard marker) to preserve intent
+  - Import maps `{ format: "json" }` back to `zex.json()` with meta preserved
+  - Roundtrip stability for `zex.json()` including nested schemas
+
+### Changed
+- README cleanup: removed "What's New" sections; consolidated into primary docs
+  - Documented JSON marker behavior and roundtrip guarantees
+  - Kept README concise; full history remains in this CHANGELOG
+
+### Refactoring
+- Internal code organization: complex types and base class split into dedicated modules for maintainability
+  - `src/zex/complex-types/*` (array, object, record, literal, tuple, helpers)
+  - `src/zex/base/*` (zex-base, zex-lazy, export-context)
+  - `fromJsonSchema` moved to `src/zex/json-schema-import.ts`
+
+### Tests
+- Added roundtrip tests for `zex.json()` including nesting and meta preservation
+
 ## [0.2.7] - 2025-01-27
 
 ### Added
@@ -121,14 +143,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Discriminated unions now use JSON Schema Draft 2020-12 discriminator format
   - Exports `{ anyOf: [...], discriminator: { propertyName: "key" } }`
   - Import only creates `ZexDiscriminatedUnion` with explicit discriminator
-- **Performance Optimizations**:
-  - Meta-only schemas now use early exit pattern
-  - Eliminated complex fallback logic at end of `fromJsonSchemaInternal`
-  - Created `isMetaOnlySchema()` helper for clear intent
-- **Code Organization**:
-  - Extracted union classes to `src/zex/unions.ts` and `src/zex/literal.ts`
-  - Created `src/zex/utils/lua.ts` for shared byte decoding
-  - Reduced file sizes to ~250 LOC guideline
+
+### Performance Optimizations
+- Meta-only schemas now use early exit pattern
+- Eliminated complex fallback logic at end of `fromJsonSchemaInternal`
+- Created `isMetaOnlySchema()` helper for clear intent
+
+### Code Organization
+- Extracted union classes to `src/zex/unions.ts` and `src/zex/literal.ts`
+- Created `src/zex/utils/lua.ts` for shared byte decoding
+- Reduced file sizes to ~250 LOC guideline
 
 ### Refactoring
 - **Simplified Discriminated Union Logic**: Removed heuristic discriminator detection

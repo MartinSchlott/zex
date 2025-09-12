@@ -122,6 +122,11 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     }
   }
 
+  // Special non-standard marker: JSON-serializable data
+  if ((schema as any).format === 'json') {
+    return zex.json().meta(meta) as ZexBase<any>;
+  }
+
   // Check for meta-only schemas (schemas with only metadata, no structural keywords)
   if (isMetaOnlySchema(schema)) {
     return zex.any().meta(meta) as ZexBase<any>;
