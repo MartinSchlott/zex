@@ -140,6 +140,34 @@ if (!result.success) {
   console.log("Result messages[1].role:", out.messages[1].role);
   console.log("Result messages[1].outputSchema:", out.messages[1].outputSchema);
 
+  // Assert defaults for createdAt/tokenCount are applied after JSONSchema roundtrip
+  const m0 = out.messages[0] as any;
+  const m1 = out.messages[1] as any;
+  if (typeof m0.createdAt !== 'number' || m0.createdAt !== 0) {
+    console.error('❌ messages[0].createdAt default missing or wrong:', m0.createdAt);
+    throw new Error('LLM roundtrip: expected messages[0].createdAt === 0');
+  } else {
+    console.log('✅ messages[0].createdAt defaulted to 0');
+  }
+  if (typeof m0.tokenCount !== 'number' || m0.tokenCount !== 0) {
+    console.error('❌ messages[0].tokenCount default missing or wrong:', m0.tokenCount);
+    throw new Error('LLM roundtrip: expected messages[0].tokenCount === 0');
+  } else {
+    console.log('✅ messages[0].tokenCount defaulted to 0');
+  }
+  if (typeof m1.createdAt !== 'number' || m1.createdAt !== 0) {
+    console.error('❌ messages[1].createdAt default missing or wrong:', m1.createdAt);
+    throw new Error('LLM roundtrip: expected messages[1].createdAt === 0');
+  } else {
+    console.log('✅ messages[1].createdAt defaulted to 0');
+  }
+  if (typeof m1.tokenCount !== 'number' || m1.tokenCount !== 0) {
+    console.error('❌ messages[1].tokenCount default missing or wrong:', m1.tokenCount);
+    throw new Error('LLM roundtrip: expected messages[1].tokenCount === 0');
+  } else {
+    console.log('✅ messages[1].tokenCount defaulted to 0');
+  }
+
   const outputSchema = out.messages[1].outputSchema as any;
   if (outputSchema && outputSchema.type === "object") {
     const isConverted =
@@ -162,4 +190,100 @@ if (!result.success) {
   } else {
     console.log("❌ outputSchema missing or not an object (this is the bug)");
   }
+}
+
+// -----------------------------
+// 5) Reproduce BigInt timestamp issue via fromJsonSchema + safeParse
+// -----------------------------
+const exactJsonSchema = {
+  type: "object",
+  properties: {
+    messages: {
+      type: "array",
+      items: {
+        anyOf: [
+          {
+            type: "object",
+            properties: {
+              createdAt: { type: "number", description: "Unix timestamp (ms) when the message was created.", default: 0 },
+              tokenCount: { type: "number", description: "Estimated or measured number of tokens in this message.", default: 0 },
+              role: { const: "system" },
+              content: { type: "string", description: "System prompt content injected into the conversation." },
+            },
+            required: ["role", "content"],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: { type: "number", description: "Unix timestamp (ms) when the message was created.", default: 0 },
+              tokenCount: { type: "number", description: "Estimated or measured number of tokens in this message.", default: 0 },
+              role: { const: "user" },
+              content: { type: "string", description: "User's message content." },
+              outputSchema: { type: "object", format: "record", properties: {}, additionalProperties: true, description: "Schema for the response of the user message. If not provided, the response will be a string." },
+            },
+            required: ["role", "content"],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: { type: "number", description: "Unix timestamp (ms) when the message was created.", default: 0 },
+              tokenCount: { type: "number", description: "Estimated or measured number of tokens in this message.", default: 0 },
+              role: { const: "assistant" },
+              content: { type: "string", description: "Assistant's textual response, or null if only tool calls were made." },
+              structured: { type: "object", format: "record", properties: {}, additionalProperties: true, description: "Parsed JSON object when the user message specified an outputSchema and the response was valid JSON." },
+              toolCalls: { type: "array", items: { type: "object", properties: { id: { type: "string", description: "ID of the tool call given by the LLM." }, toolName: { type: "string", description: "Name of the tool to be called." }, arguments: { type: "object", format: "record", properties: {}, additionalProperties: true, description: "Arguments for the function, als JSON-Objekt." } }, required: ["id", "toolName", "arguments"], additionalProperties: false }, description: "Tool calls issued by the assistant." },
+              stopReason: { enum: ["stop", "length", "content-filter", "tool-calls", "error", "other", "unknown"], description: "Reason for stopping the LLM response." },
+            },
+            required: ["role", "content"],
+            additionalProperties: false,
+          },
+          {
+            type: "object",
+            properties: {
+              createdAt: { type: "number", description: "Unix timestamp (ms) when the message was created.", default: 0 },
+              tokenCount: { type: "number", description: "Estimated or measured number of tokens in this message.", default: 0 },
+              role: { const: "tool" },
+              content: { type: "string", description: "Serialized result string of the tool's output." },
+              id: { type: "string", description: "ID of the ToolCall this tool message responds to. The ID was given by the LLM." },
+              name: { type: "string", description: "Name of the tool/function that was executed." },
+            },
+            required: ["role", "content", "id", "name"],
+            additionalProperties: false,
+          },
+        ],
+        discriminator: { propertyName: "role" },
+        description: "LLMMessage - Any message in the conversation with role-specific structure.",
+      },
+      description: "Chronological sequence of exchanged messages.",
+    },
+    tools: {
+      type: "array",
+      items: { type: "object", properties: { name: { type: "string", description: "Unique tool identifier" }, description: { type: "string", description: "Description of what this endpoint does" }, inputSchema: { type: "object", format: "jsonschema", description: "JSON Schema for input validation" }, outputSchema: { type: "object", format: "jsonschema", description: "JSON Schema for output structure" } }, required: ["name", "description", "inputSchema"], additionalProperties: false, description: "Operator endpoint definition" },
+      description: "Tools available to the assistant in this session.",
+    },
+  },
+  required: ["messages"],
+  additionalProperties: false,
+  description: "LLMConversationState - Represents the current context of an assistant session.",
+} as const;
+
+const roundtrip = zex.fromJsonSchema(exactJsonSchema);
+
+// BigInt timestamps sample
+const sampleWithBigInt = {
+  messages: [
+    { role: "system", content: "You are a helpful assistant.", createdAt: 1757875291589n, tokenCount: 0 },
+    { role: "user", content: "test", createdAt: 1757875291589n, tokenCount: 0 },
+  ],
+  tools: [],
+};
+
+console.log("Running safeParse on sampleWithBigInt...");
+const r2 = roundtrip.safeParse(sampleWithBigInt);
+if (!r2.success) {
+  console.log("❌ safeParse failed as expected with BigInt createdAt:", r2.error);
+} else {
+  console.log("✅ safeParse unexpectedly succeeded:", r2.data);
 }

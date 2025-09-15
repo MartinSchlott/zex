@@ -178,7 +178,10 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (schema.pattern !== undefined) {
       stringSchema = stringSchema.pattern(schema.pattern);
     }
-    
+    // Apply default if provided
+    if ((schema as any).default !== undefined) {
+      stringSchema = (stringSchema as any).default((schema as any).default);
+    }
     return stringSchema.meta(meta) as ZexBase<any>;
   }
   
@@ -206,12 +209,19 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (schema.type === 'integer') {
       numberSchema = numberSchema.int();
     }
-    
+    // Apply default if provided
+    if ((schema as any).default !== undefined) {
+      numberSchema = (numberSchema as any).default((schema as any).default);
+    }
     return numberSchema.meta(meta) as ZexBase<any>;
   }
   
   if (schema.type === "boolean") {
-    return zex.boolean().meta(meta) as ZexBase<any>;
+    let boolSchema = zex.boolean();
+    if ((schema as any).default !== undefined) {
+      boolSchema = (boolSchema as any).default((schema as any).default);
+    }
+    return boolSchema.meta(meta) as ZexBase<any>;
   }
   
   // Arrays und Objekte (Logik unverändert)
@@ -285,7 +295,12 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (schema.properties && typeof schema.properties === "object") {
       for (const [key, propSchema] of Object.entries(schema.properties)) {
         let z = fromJsonSchemaInternal(propSchema, [...path, key], root, ctx);
-        if (!required.includes(key)) z = z.optional();
+        const hasDefault = (propSchema as any) && (propSchema as any).default !== undefined;
+        // If property is not listed in required and does NOT have a default, mark as optional.
+        // If a default exists, keep it non-optional so that object parsing applies the default when missing.
+        if (!required.includes(key) && !hasDefault) {
+          z = (z as any).optional();
+        }
         shape[key] = z;
       }
     }

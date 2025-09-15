@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.2.10] - 2025-09-15
+
+### Fixed
+- JSON Schema importer applies `default` for primitives (string/number/boolean) and keeps defaulted object properties non-optional on import.
+  - Ensures fields like `createdAt`/`tokenCount` with `default: 0` are populated even when missing from input after roundtrip (zex → JSON Schema → zex).
+  - Discriminated union inside array (messages[].role) continues to work as before.
+
+### Tests
+- Added behavior test for LLM conversation schema roundtrip (including `safeParseFromLua`) asserting defaults for `createdAt`/`tokenCount`.
+- Added behavior test reproducing BigInt timestamps scenario to document MessagePack decoding behavior (int64 as BigInt) and expected number validation error.
+
 ## [0.2.8] - 2025-09-12
 
 ### Added
