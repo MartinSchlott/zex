@@ -426,15 +426,13 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 Current: `0.2.8`.
 
-## Built with AI in One Day
+## Built with AI 
 
-This entire library was built in a single day using:
-- **Claude** for architecture and complex logic
-- **ChatGPT** for API design feedback  
-- **Gemini** for edge case handling
-- **Cursor** for rapid development and refactoring
+This entire library is built and maintained with AI and Cursor.
 
 It proves that AI-assisted development can create production-ready code incredibly fast when you know what problems you're solving.
+
+Features are added by first designing the test cases and ask the AI to implement them.
 
 ## Project Philosophy
 
