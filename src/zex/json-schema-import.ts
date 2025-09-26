@@ -48,6 +48,279 @@ const zex = {
   jsonschema: () => new ZexJsonSchema(),
 };
 
+// --- Policy-driven Import Pipeline (Schema/Type transforms) ---
+
+export type RefResolver = (ref: string, ctx: { root: unknown; baseUri?: string }) => unknown;
+export type SchemaTransform = (schema: any, ctx: { resolver?: RefResolver; root: any; baseUri?: string }) => any;
+export type TypeTransform = (schema: ZexBase<any, any>) => ZexBase<any, any>;
+
+type Policy = {
+  schemaTransforms?: SchemaTransform[];
+  typeTransforms?: TypeTransform[];
+  options?: Record<string, unknown>;
+};
+
+const policyRegistry = new Map<string, Policy>();
+
+export function registerPolicy(name: string, policy: Policy): void {
+  policyRegistry.set(name, policy);
+}
+
+export function applyTypeTransforms<T extends ZexBase<any, any>>(root: T, transforms: TypeTransform[]): T {
+  let current: ZexBase<any, any> = root;
+  for (const t of transforms) current = t(current);
+  return current as T;
+}
+
+function deepMapSchema(schema: any, mapper: (node: any) => any): any {
+  const visit = (node: any): any => {
+    const mapped = mapper(node);
+    if (!mapped || typeof mapped !== 'object') return mapped;
+    // Recurse into known containers
+    if (Array.isArray(mapped)) return mapped.map(visit);
+    const out: any = Array.isArray(mapped) ? [] : { ...mapped };
+    if (out.properties && typeof out.properties === 'object') {
+      const p: any = {};
+      for (const [k, v] of Object.entries(out.properties)) p[k] = visit(v);
+      out.properties = p;
+    }
+    if (out.$defs && typeof out.$defs === 'object') {
+      const d: any = {};
+      for (const [k, v] of Object.entries(out.$defs)) d[k] = visit(v);
+      out.$defs = d;
+    }
+    if (out.items !== undefined) {
+      if (Array.isArray(out.items)) out.items = out.items.map(visit);
+      else out.items = visit(out.items);
+    }
+    for (const key of ['anyOf','oneOf','allOf']) {
+      if (Array.isArray(out[key])) out[key] = out[key].map(visit);
+    }
+    return out;
+  };
+  return visit(schema);
+}
+
+function makeDerefTransform(resolver?: RefResolver, root?: any, baseUri?: string): SchemaTransform | undefined {
+  if (!resolver) return undefined;
+  return (schema: any) => deepMapSchema(schema, (node: any) => {
+    if (node && typeof node === 'object' && typeof node.$ref === 'string') {
+      const ref: string = node.$ref;
+      // Leave local $defs refs to core importer
+      const isLocal = ref.startsWith('#/');
+      if (isLocal) return node;
+      const resolved = resolver(ref, { root, baseUri });
+      if (!resolved || typeof resolved !== 'object') {
+        throw new Error(`deref: resolver did not return an object for ref '${ref}'`);
+      }
+      return resolved;
+    }
+    return node;
+  });
+}
+
+// Normalize nullability encodings and array items fallback
+const nullableFromAnyOfTransform: SchemaTransform = (schema: any) => deepMapSchema(schema, (node: any) => {
+  if (!node || typeof node !== 'object') return node;
+  // type: ['T','null'] → anyOf
+  if (Array.isArray(node.type)) {
+    const types: string[] = node.type;
+    if (types.includes('null') && types.filter(t => t !== 'null').length === 1) {
+      const base = { ...node, type: types.find(t => t !== 'null') };
+      delete (base as any).oneOf;
+      delete (base as any).allOf;
+      return { anyOf: [base, { type: 'null' }] };
+    }
+  }
+  // oneOf([X, null]) → anyOf([X, null]) for import compatibility
+  if (Array.isArray(node.oneOf)) {
+    const arr = node.oneOf as any[];
+    const hasNull = arr.some(s => s && typeof s === 'object' && s.type === 'null');
+    const others = arr.filter(s => !(s && typeof s === 'object' && s.type === 'null'));
+    if (hasNull && others.length === 1) {
+      return { anyOf: [others[0], { type: 'null' }] };
+    }
+  }
+  // anyOf ok as-is; importer will build union
+  return node;
+});
+
+const arrayItemsFallbackTransform: SchemaTransform = (schema: any) => deepMapSchema(schema, (node: any) => {
+  if (node && typeof node === 'object' && node.type === 'array' && node.items === undefined) {
+    return { ...node, items: {} };
+  }
+  return node;
+});
+
+// --- Type Transform Helpers ---
+function copyMeta(from: ZexBase<any, any>, to: ZexBase<any, any>): ZexBase<any, any> {
+  const m = (from as any).meta?.() ?? (from as any).config?.meta ?? {};
+  if (m && typeof (to as any).meta === 'function') {
+    return (to as any).meta(m) as ZexBase<any, any>;
+  }
+  return to;
+}
+
+function copyFlags(from: ZexBase<any, any>, to: ZexBase<any, any>): ZexBase<any, any> {
+  const cfg = (from as any).config || {};
+  let out = to;
+  // Apply default first (removes optional in Zex semantics)
+  if (cfg.defaultValue !== undefined && typeof (out as any).default === 'function') {
+    out = (out as any).default(cfg.defaultValue);
+  }
+  if (cfg.nullable && typeof (out as any).nullable === 'function') {
+    out = (out as any).nullable();
+  }
+  if (cfg.optional && cfg.defaultValue === undefined && typeof (out as any).optional === 'function') {
+    out = (out as any).optional();
+  }
+  return out;
+}
+
+function rebuild(from: ZexBase<any, any>, to: ZexBase<any, any>): ZexBase<any, any> {
+  let out = copyMeta(from, to);
+  out = copyFlags(from, out);
+  return out;
+}
+
+type SqlStrategy = {
+  int64Strategy: 'string' | 'number';
+  numericStrategy: 'string' | 'number' | 'decimal';
+};
+
+function makeSqlTypeTransform(strategies: SqlStrategy): TypeTransform {
+  const visit = (node: ZexBase<any, any>): ZexBase<any, any> => {
+    // Unions: flatten and collapse nullable
+    if (node instanceof ZexUnion) {
+      // Transform children first
+      const schemas: ZexBase<any, any>[] = (node as any).schemas?.map((s: ZexBase<any, any>) => visit(s)) ?? [];
+      // Flatten nested unions
+      const flat: ZexBase<any, any>[] = [];
+      for (const s of schemas) {
+        if (s instanceof ZexUnion && (s as any).schemas) flat.push(...(s as any).schemas);
+        else flat.push(s);
+      }
+      // Collapse union with null
+      const nonNull = flat.filter(s => !(s instanceof ZexNull));
+      const hasNull = flat.length !== nonNull.length;
+      if (hasNull && nonNull.length === 1) {
+        const base = nonNull[0];
+        if (typeof (base as any).nullable === 'function') {
+          const collapsed = (base as any).nullable();
+          return rebuild(node, collapsed);
+        }
+      }
+      if (flat.length === 1) {
+        const single = visit(flat[0]);
+        return rebuild(node, single);
+      }
+      const rebuilt = new ZexUnion(flat as any);
+      return rebuild(node, rebuilt);
+    }
+
+    if (node instanceof ZexDiscriminatedUnion) {
+      const key = (node as any).discriminatorKey;
+      const variants: ZexObject<Record<string, ZexBase<any, any>>>[] = ((node as any).variants || []).map((v: ZexObject<any>) => visit(v)) as any;
+      const rebuilt = (zex as any).discriminatedUnion(key, ...(variants as any));
+      return rebuild(node, rebuilt);
+    }
+
+    if (node instanceof ZexObject) {
+      const shape = (node as any).shape as Record<string, ZexBase<any, any>>;
+      const newShape: Record<string, ZexBase<any, any>> = {};
+      for (const [k, v] of Object.entries(shape)) newShape[k] = visit(v);
+      let rebuilt = (zex as any).object(newShape, false, 'strict'); // addlPropsFalse policy
+      rebuilt = rebuild(node, rebuilt);
+      return rebuilt;
+    }
+
+    if (node instanceof ZexArray) {
+      const inner = (node as any).schema ? visit((node as any).schema) : (node as any).itemSchema ? visit((node as any).itemSchema) : undefined;
+      let rebuilt = inner ? (zex as any).array(inner) : node;
+      rebuilt = rebuild(node, rebuilt);
+      return rebuilt;
+    }
+
+    if (node instanceof ZexRecord) {
+      const vs = (node as any).valueSchema ? visit((node as any).valueSchema) : undefined;
+      let rebuilt = vs ? (zex as any).record(vs) : node;
+      rebuilt = rebuild(node, rebuilt);
+      return rebuilt;
+    }
+
+    if (node instanceof ZexTuple) {
+      const schemas: ZexBase<any, any>[] = ((node as any).schemas || []).map((s: ZexBase<any, any>) => visit(s));
+      const rebuilt = (zex as any).tuple(schemas);
+      return rebuild(node, rebuilt);
+    }
+
+    if (node instanceof ZexEnum) {
+      const values = (node as any).options as readonly unknown[];
+      const allStrings = values.every(v => typeof v === 'string');
+      if (!allStrings) {
+        const literals = values.map(v => (zex as any).literal(v));
+        const rebuilt = (zex as any).union(...(literals as any));
+        return rebuild(node, rebuilt);
+      }
+      return node;
+    }
+
+    if (node instanceof ZexString) {
+      const meta = (node as any).meta?.() ?? {};
+      const fmt = (meta as any).format as string | undefined;
+      const pg = (meta as any)['x-pg-type'] as string | undefined;
+      // bytea → buffer
+      if ((fmt && fmt.toLowerCase() === 'bytea') || pg === 'bytea') {
+        const rebuilt = (zex as any).buffer();
+        return rebuild(node, rebuilt);
+      }
+      // json/jsonb → zex.json()
+      if (pg === 'json' || pg === 'jsonb') {
+        const rebuilt = (zex as any).json();
+        return rebuild(node, rebuilt);
+      }
+      // timestamps → date-time
+      const tsFormats = ['timestamp without time zone', 'timestamp with time zone', 'timestamptz'];
+      if (fmt && tsFormats.includes(fmt)) {
+        const rebuilt = (node as any).format('date-time');
+        return rebuilt;
+      }
+      // inet/cidr/macaddr: keep as-is (format preserved from meta)
+      return node;
+    }
+
+    if (node instanceof ZexNumber) {
+      const meta = (node as any).meta?.() ?? {};
+      const fmt = (meta as any).format as string | undefined;
+      const pg = (meta as any)['x-pg-type'] as string | undefined;
+      if ((fmt === 'int64' || pg === 'int8')) {
+        if (strategies.int64Strategy === 'string') {
+          const rebuilt = (zex as any).string();
+          return rebuild(node, rebuilt);
+        }
+        // number: keep, ensure integer if possible
+        try { return (node as any).int?.() ?? node; } catch { return node; }
+      }
+      if ((fmt === 'numeric' || fmt === 'decimal' || pg === 'numeric')) {
+        if (strategies.numericStrategy === 'string') {
+          const rebuilt = (zex as any).string();
+          return rebuild(node, rebuilt);
+        }
+      }
+      return node;
+    }
+
+    return node;
+  };
+  return (root: ZexBase<any, any>) => visit(root);
+}
+
+// Register built-in 'sql' policy
+registerPolicy('sql', {
+  schemaTransforms: [nullableFromAnyOfTransform, arrayItemsFallbackTransform],
+  typeTransforms: [makeSqlTypeTransform({ int64Strategy: 'string', numericStrategy: 'string' })]
+});
+
 // --- fromJsonSchema Implementation ---
 
 function buildPathString(path: (string | number)[], root?: string): string {
@@ -224,6 +497,10 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     return boolSchema.meta(meta) as ZexBase<any>;
   }
   
+  if (schema.type === "null") {
+    return zex.null().meta(meta) as ZexBase<any>;
+  }
+  
   // Arrays und Objekte (Logik unverändert)
   if (schema.type === "array") {
     // Check for tuple (fixed-length array with prefixItems)
@@ -370,13 +647,55 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
 }
 
 // Public functions
-export function fromJsonSchema(schema: any, options?: { rootName?: string }): ZexBase<any> {
-  const defs = (schema && typeof schema === 'object' && (schema as any).$defs) || {};
+export function fromJsonSchema(
+  schema: any,
+  options?: {
+    rootName?: string;
+    policy?: string;
+    schemaTransforms?: SchemaTransform[];
+    typeTransforms?: TypeTransform[];
+    deref?: RefResolver;
+  }
+): ZexBase<any> {
+  // Build transform lists
+  const policy = options?.policy ? policyRegistry.get(options.policy) : undefined;
+  const schemaTransforms: SchemaTransform[] = [];
+  const deref = makeDerefTransform(options?.deref, schema, undefined);
+  if (deref) schemaTransforms.push(deref);
+  if (policy?.schemaTransforms) schemaTransforms.push(...policy.schemaTransforms);
+  if (options?.schemaTransforms) schemaTransforms.push(...options.schemaTransforms);
+
+  let effectiveSchema = schema;
+  if (schemaTransforms.length > 0) {
+    // Apply sequentially
+    for (const t of schemaTransforms) {
+      effectiveSchema = t(effectiveSchema, { resolver: options?.deref, root: schema, baseUri: undefined });
+    }
+  }
+
+  const defs = (effectiveSchema && typeof effectiveSchema === 'object' && (effectiveSchema as any).$defs) || {};
   const ctx: ImportCtx = { defs, memo: new Map() };
-  return fromJsonSchemaInternal(schema, [], options?.rootName, ctx);
+  let z = fromJsonSchemaInternal(effectiveSchema, [], options?.rootName, ctx);
+
+  const typeTransforms: TypeTransform[] = [];
+  if (policy?.typeTransforms) typeTransforms.push(...policy.typeTransforms);
+  if (options?.typeTransforms) typeTransforms.push(...options.typeTransforms);
+  if (typeTransforms.length > 0) {
+    z = applyTypeTransforms(z, typeTransforms);
+  }
+  return z;
 }
 
-export function safeFromJsonSchema(schema: any, options?: { rootName?: string }): { success: true; schema: ZexBase<any> } | { success: false; error: string } {
+export function safeFromJsonSchema(
+  schema: any,
+  options?: {
+    rootName?: string;
+    policy?: string;
+    schemaTransforms?: SchemaTransform[];
+    typeTransforms?: TypeTransform[];
+    deref?: RefResolver;
+  }
+): { success: true; schema: ZexBase<any> } | { success: false; error: string } {
   try {
     const z = fromJsonSchema(schema, options);
     return { success: true, schema: z };

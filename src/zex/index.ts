@@ -8,7 +8,7 @@ import { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types/index.
 import { ZexLiteral } from './complex-types/index.js';
 import { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
 import { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
-import { fromJsonSchema, safeFromJsonSchema, transformLua } from './json-schema-import.js';
+import { fromJsonSchema, safeFromJsonSchema, transformLua, registerPolicy, applyTypeTransforms } from './json-schema-import.js';
 
 // Public API
 export const zex = {
@@ -56,9 +56,11 @@ export const zex = {
   },
 
   // Parser functions
-  fromJsonSchema: (schema: any, options?: { rootName?: string }) => fromJsonSchema(schema, options),
-  safeFromJsonSchema: (schema: any, options?: { rootName?: string }) => safeFromJsonSchema(schema, options),
+  fromJsonSchema: (schema: any, options?: any) => fromJsonSchema(schema, options as any),
+  safeFromJsonSchema: (schema: any, options?: any) => safeFromJsonSchema(schema, options as any),
   transformLua: (data: unknown, schema: ZexBase<unknown>) => transformLua(data, schema),
+  registerPolicy: (name: string, policy: any) => registerPolicy(name, policy),
+  applyTypeTransforms: (schema: ZexBase<any, any>, transforms: any[]) => applyTypeTransforms(schema as any, transforms as any),
 
   // Path tracking helper
   rootParseInfo: (description: string) => ({ rootDescription: description })

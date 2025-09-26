@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.3.0] - 2025-09-26
+
+### Added
+- Policy-driven JSON Schema import pipeline
+  - New `fromJsonSchema(schema, { policy?, schemaTransforms?, typeTransforms?, deref? })`
+  - Pre-parse SchemaTransforms and post-parse TypeTransforms with composable API
+  - `zex.registerPolicy(name, { schemaTransforms, typeTransforms })`
+  - `zex.applyTypeTransforms(zexType, transforms)` helper
+- Built-in `sql` policy (PostgreSQL-focused)
+  - SchemaTransforms:
+    - `nullableFromAnyOf`: normalize `anyOf`/`oneOf`/`type:[T,'null']` → `T.nullable()`
+    - `arrayItemsFallback`: missing `items` → `items: {}` (any)
+  - TypeTransforms:
+    - `addlPropsFalse`: force `additionalProperties: false` on all objects
+    - `enumAsLiterals`: keep `zex.enum([...])` for strings-only enums, else union of literals
+    - `integer64Strategy: 'string'` (default) for `format:'int64'` or `x-pg-type:'int8'`
+    - `numericStrategy: 'string'` (default) for `format:'numeric'|'decimal'` or `x-pg-type:'numeric'`
+    - `formatMap`: timestamps → `date-time`; `uuid` → `.uuid()`; `json/jsonb` → `zex.json()`; `bytea` → `zex.buffer()`; preserve `inet/cidr/macaddr`
+- Deref hook for external `$ref` resolution: `deref(ref, { root, baseUri? })` (sync/async supported)
+
+### Changed
+- Importer now recognizes `type: 'null'` directly
+- Type rebuild operations preserve flags and meta (optional, nullable, default, description, etc.)
+
+### Documentation
+- README section on Policy-Driven Import with examples and SQL preset details
+
+### Tests
+- New suite under `tests/sql/*` covering:
+  - SQL policy basic behavior
+  - additionalProperties strictness
+  - nullability normalization patterns
+  - enum handling strategy
+  - format mapping for PostgreSQL types
+  - int64/numeric strategies
+  - array items fallback
+  - deref hook
+  - no-policy regression expectations
+
 ## [0.2.10] - 2025-09-15
 
 ### Fixed

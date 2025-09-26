@@ -56,6 +56,17 @@ await runImport('./jsonschema/complex-union-bug.test.ts');
 await runImport('./jsonschema/additional-properties-export.test.ts');
 await runImport('./jsonschema/any-empty-and-true-acceptance.test.ts');
 
+// SQL Policy (new)
+await runImport('./sql/policy-sql-basic.test.ts');
+await runImport('./sql/transform-addlPropsFalse.test.ts');
+await runImport('./sql/transform-nullableFromAnyOf.test.ts');
+await runImport('./sql/transform-enumAsLiterals.test.ts');
+await runImport('./sql/transform-formatMap-sql.test.ts');
+await runImport('./sql/transform-int64-numeric-strategies.test.ts');
+await runImport('./sql/transform-arrayItemsFallback.test.ts');
+await runImport('./sql/transform-deref.test.ts');
+await runImport('./sql/no-policy-defaults-unchanged.test.ts');
+
 // Integration
 await runImport('./integration/llm-and-node.test.ts');
 await runImport('./integration/supabase-config.test.ts');

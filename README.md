@@ -158,6 +158,56 @@ const jsonDataJson = jsonData.toJSONSchema();
   - `maximum === 0` → `.nonpositive()`
 - Export includes all constraints without deduplication; when multiple bounds exist, the tighter bound prevails at runtime.
 
+### Policy-Driven Import (New in 0.3.0)
+
+Zex can now normalize imported JSON Schemas via pre-parse SchemaTransforms and post-parse TypeTransforms.
+
+- `zex.fromJsonSchema(schema, { policy?, schemaTransforms?, typeTransforms?, deref? })`
+- `zex.registerPolicy(name, { schemaTransforms, typeTransforms })`
+- `zex.applyTypeTransforms(zexType, transforms)`
+
+Phases:
+- SchemaTransforms (pre-parse): operate on the JSON Schema before import (e.g., nullability normalization, array items fallback, custom `$ref` resolution).
+- TypeTransforms (post-parse): operate on the returned Zex type graph (e.g., strict objects, enum handling, format mapping).
+
+#### Built-in: SQL Policy
+Enable with `policy: 'sql'` to make SQL/OpenAPI-origin schemas ergonomic without app-side post-processing.
+
+- SchemaTransforms:
+  - `nullableFromAnyOf`: normalizes `anyOf`/`oneOf`/`type:[T,'null']` into `T.nullable()`
+  - `arrayItemsFallback`: missing `items` → `items: {}` (i.e., `any`)
+- TypeTransforms:
+  - `addlPropsFalse`: all objects become strict (`additionalProperties: false`)
+  - `enumAsLiterals`: keep `zex.enum([...])` when all values are strings; otherwise `zex.union(zex.literal(...))`
+  - `integer64Strategy: 'string'` by default; map `int64`/`x-pg-type:int8` to string
+  - `numericStrategy: 'string'` by default; map `numeric/decimal` to string
+  - `formatMap`:
+    - `timestamp without time zone` | `timestamp with time zone` | `timestamptz` → `.format('date-time')`
+    - `uuid` → `zex.string().uuid()`
+    - `json`/`jsonb` (via `x-pg-type`) → `zex.json()`
+    - `bytea` → `zex.buffer()`
+    - `inet`/`cidr`/`macaddr` formats preserved
+
+Example:
+```typescript
+const imported = zex.fromJsonSchema(somePgJsonSchema, { policy: 'sql' });
+// All objects strict, nullability normalized, int64/numeric mapped per strategy,
+// bytea → buffer, jsonb → zex.json(), timestamps → date-time.
+```
+
+Customization:
+```typescript
+zex.registerPolicy('my-sql', {
+  schemaTransforms: [/* custom pre-parse transforms */],
+  typeTransforms: [/* custom post-parse transforms */]
+});
+
+const t = zex.fromJsonSchema(schema, {
+  policy: 'my-sql',
+  deref: async (ref, ctx) => {/* resolve external refs */}
+});
+```
+
 #### UI Hints and Annotations
 - String UI hint `.multiline(n?)` exports to `x-ui-multiline` in JSON Schema; omitted when 0. `getMultiline()` returns the number (default 0).
 - Access annotations `.readOnly()` / `.writeOnly()` export JSON Schema `readOnly: true` / `writeOnly: true`. Passing `false` removes the key. Imported `false` values are normalized (dropped). These flags are documentation-only and do not affect parsing/validation.
@@ -424,7 +474,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.2.8`.
+Current: `0.3.0`.
 
 ## Built with AI 
 
