@@ -31,6 +31,8 @@ await runImport('./unit/complex/literal-enum.test.ts');
 // Unit: special
 await runImport('./unit/special/uri-url-buffer-jsonschema.test.ts');
 await runImport('./unit/special/refine.test.ts');
+await runImport('./unit/special/delta-parse.test.ts');
+await runImport('./unit/special/delta-replace.test.ts');
 
 // Behavior
 await runImport('./behavior/type-inference.test.ts');

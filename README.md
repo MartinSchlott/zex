@@ -35,6 +35,7 @@ Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses th
 - ✅ **Object Utilities**: `object.partial()`, `object.omit(...)`, `omitReadOnly()`, `omitWriteOnly()` for ergonomic object shaping
 - ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
 - ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
+ - ✅ **Delta & Replace APIs (0.4.0)**: Validate and apply sub-tree updates efficiently
 
 *See [CHANGELOG.md](./CHANGELOG.md) for full details.*
 
@@ -301,6 +302,45 @@ const bufferJson = genericBuffer.toJSONSchema();
 // Result: { "type": "object", "format": "buffer" }
 ```
 
+### Delta & Replace APIs (new in 0.4.0)
+```typescript
+const User = zex.object({
+  profile: zex.object({
+    name: zex.string().min(2),
+    nickname: zex.string().optional(),
+    contacts: zex.array(zex.union(
+      zex.object({ kind: zex.literal('email'), value: zex.string().email() }),
+      zex.object({ kind: zex.literal('phone'), value: zex.string().pattern('^\\+?[0-9]{7,15}$') })
+    ))
+  }),
+  coords: zex.tuple([zex.number(), zex.number()]),
+  settings: zex.object({ theme: zex.enum(['light','dark']), flags: zex.record(zex.boolean()) }),
+  pets: zex.array(zex.discriminatedUnion('type',
+    zex.object({ type: zex.literal('dog'), barks: zex.boolean() }),
+    zex.object({ type: zex.literal('cat'), meows: zex.boolean() })
+  ))
+});
+
+// Validate a value at a sub-path (JSON Pointer; supports "", "/", no leading slash)
+(User as any).parseDelta('/profile/name', 'Alice');
+(User as any).safeParseDelta('coords/1', 5);
+
+// Replace-only update with full root validation
+const next = (User as any).replace(current, '/profile/name', 'Bob');
+// Optional deletion for object properties via undefined
+const next2 = (User as any).replace(next, '/profile/nickname', undefined);
+// Arrays/tuples by index; in-range only, no deletion via undefined
+const next3 = (User as any).replace(next2, '/coords/0', 1);
+// Discriminated unions: replace whole element when changing discriminator
+const next4 = (User as any).replace(next3, '/pets/0', { type: 'cat', meows: true });
+```
+
+Guidelines:
+- Replace-only, no merge/append/move.
+- `undefined` deletes only optional object properties; arrays/root cannot be deleted.
+- JSON Pointer escapes supported: `~1` → `/`, `~0` → `~`.
+- Deep traversal inside unions via `parseDelta` is not allowed; use `replace` with the current instance.
+
 #### Record Format
 Record types use a special format marker for perfect roundtrips:
 
@@ -497,7 +537,7 @@ Zex is **not** a drop-in replacement for Zod. The API is similar but intentional
 
 ## Version
 
-Current: `0.3.0`.
+Current: `0.4.0`.
 
 ## Built with AI 
 
@@ -516,10 +556,7 @@ Features are added by first designing the test cases and ask the AI to implement
 
 ## What's Missing
 
-Currently missing some Zod features I didn't need:
-- **Refinements**: Custom validation functions (validators system covers this differently)
-- **Transforms**: Data transformation during parsing
-- **Preprocessing**: Input sanitization before validation
+Transforms/Preprocessing (dedicated API) are not implemented yet.
 
 If you need these features, feel free to fork and extend and drop me a line! I may ask my AI to integrate them.
 

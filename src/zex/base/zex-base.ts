@@ -198,6 +198,373 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     }
   }
 
+  // Delta APIs
+  // =============================================================================
+  // parseDelta: validate a value against the sub-schema at a JSON Pointer path
+  parseDelta(path: string, value: unknown): unknown {
+    const segments = this.normalizeAndSplitPointer(path);
+    if (segments.length === 0) {
+      return (this as any).parse(value);
+    }
+    const { targetSchema, pathForError } = this.resolveSchemaForDelta(segments);
+    // Deletion via undefined is allowed only for optional object properties; this is enforced
+    // by the target schema itself: parsing undefined succeeds only if optional.
+    return (targetSchema as any).parse(value);
+  }
+
+  safeParseDelta(path: string, value: unknown): { success: true; data: unknown } | { success: false; error: string } {
+    try {
+      const data = this.parseDelta(path, value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  // replace: apply replace-only delta at path to an existing instance, returning a new validated instance
+  replace(instance: T, path: string, value: unknown): T {
+    const segments = this.normalizeAndSplitPointer(path);
+    // Root replacement
+    if (segments.length === 0) {
+      if (value === undefined) {
+        throw new ZexError(['root'], 'invalid_delete', `Cannot delete root with undefined`, undefined, 'non-undefined root');
+      }
+      return this.parse(value);
+    }
+
+    // Resolve schema and parent containers using current instance
+    const { parentContainers, leafKeyOrIndex, leafSchema, containerKind } = this.resolveForReplace(instance as any, segments);
+
+    // Deletion semantics for object properties only
+    if (value === undefined) {
+      if (containerKind !== 'object') {
+        throw new ZexError(segments.map(s => String(s)), 'invalid_delete', `Deletion via undefined is only allowed for optional object properties`, undefined, 'optional object property');
+      }
+      const isOptional = !!((leafSchema as any)?.config?.optional);
+      if (!isOptional) {
+        throw new ZexError(segments.map(s => String(s)), 'invalid_delete_required', `Cannot delete required property '${String(leafKeyOrIndex)}'`, undefined, 'optional property');
+      }
+    } else {
+      // Local validation against sub-schema
+      (leafSchema as any).parse(value);
+    }
+
+    // Apply immutable update
+    let newChild: any;
+    if (value === undefined) {
+      newChild = undefined; // signal deletion for object property
+    } else {
+      newChild = (leafSchema as any).parse(value);
+    }
+
+    // Rebuild containers from leaf to root
+    let updated: any;
+    const last = parentContainers[parentContainers.length - 1];
+    if (last.kind === 'object') {
+      const copy = { ...(last.value as any) };
+      if (value === undefined) delete copy[leafKeyOrIndex as string];
+      else copy[leafKeyOrIndex as string] = newChild;
+      updated = copy;
+    } else if (last.kind === 'array') {
+      const idx = leafKeyOrIndex as number;
+      const arr = Array.isArray(last.value) ? [...(last.value as any[])] : (() => { throw new ZexError(segments.map(s => String(s)), 'type_mismatch', 'Expected array at parent container', last.value, 'array'); })();
+      arr[idx] = newChild;
+      updated = arr;
+    } else {
+      throw new ZexError(segments.map(s => String(s)), 'invalid_container', `Unsupported parent container kind '${last.kind}'`, undefined, 'object or array');
+    }
+
+    // Bubble up
+    for (let i = parentContainers.length - 2; i >= 0; i--) {
+      const frame = parentContainers[i];
+      if (frame.kind === 'object') {
+        const copy = { ...(frame.value as any) };
+        copy[frame.keyOrIndex as string] = updated;
+        updated = copy;
+      } else if (frame.kind === 'array') {
+        const arr = Array.isArray(frame.value) ? [...(frame.value as any[])] : (() => { throw new ZexError(segments.map(s => String(s)), 'type_mismatch', 'Expected array while rebuilding containers', frame.value, 'array'); })();
+        arr[frame.keyOrIndex as number] = updated;
+        updated = arr;
+      } else {
+        // Root container: should not occur here
+        throw new ZexError(segments.map(s => String(s)), 'invalid_container', `Invalid container during rebuild`, undefined, 'object or array');
+      }
+    }
+
+    // Full root validation (may apply defaults etc.)
+    return this.parse(updated);
+  }
+
+  safeReplace(instance: T, path: string, value: unknown): { success: true; data: T } | { success: false; error: string } {
+    try {
+      const data = this.replace(instance, path, value);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  // Internal helpers for delta/replace
+  // =============================================================================
+  private normalizeAndSplitPointer(path: string): (string | number)[] {
+    if (path == null) return [];
+    const trimmed = String(path);
+    if (trimmed === '' || trimmed === '/') return [];
+    const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    const parts = withSlash.split('/').slice(1).map(seg => this.decodePointerSegment(seg));
+    return parts;
+  }
+
+  private decodePointerSegment(seg: string): string {
+    // JSON Pointer decoding: ~1 => /, ~0 => ~
+    return seg.replace(/~1/g, '/').replace(/~0/g, '~');
+  }
+
+  private resolveSchemaForDelta(segments: (string | number)[]): { targetSchema: any; pathForError: string[] } {
+    let schema: any = this;
+    const pathStr: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      pathStr.push(String(seg));
+      // Lazy unwrap
+      if ((schema as any)?.getSchema && typeof (schema as any).getSchema === 'function') {
+        schema = (schema as any).getSchema();
+      }
+      // Discriminated union: only allow replacing whole union or the discriminator key directly
+      if ((schema as any)?.discriminatorKey && (schema as any)?.variants) {
+        const disc = (schema as any).discriminatorKey as string;
+        if (i === segments.length - 1 && seg === disc) {
+          const anyVariant = (schema as any).variants[0];
+          const next = (anyVariant as any).shape?.[disc];
+          if (!next) throw new ZexError(pathStr, 'unknown_property', `Unknown property '${disc}' in discriminated union`, undefined, 'discriminator property');
+          return { targetSchema: next, pathForError: pathStr };
+        }
+        if (i < segments.length - 1) {
+          throw new ZexError(pathStr, 'union_path_requires_instance', `Cannot resolve path under discriminated union without instance. Use replace().`, undefined, 'instance-based traversal');
+        }
+        // i === last: replacing whole union
+        return { targetSchema: schema, pathForError: pathStr };
+      }
+      // Tuple first: distinguish from plain union
+      if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && (schema as any)?.getBaseJsonSchema?.().prefixItems !== undefined) {
+        const idx = this.parseArrayIndex(seg, pathStr);
+        const arr = (schema as any).schemas as any[];
+        if (idx < 0 || idx >= arr.length) {
+          throw new ZexError(pathStr, 'index_out_of_range', `Tuple index ${idx} out of range`, idx, `0..${arr.length - 1}`);
+        }
+        schema = arr[idx];
+        continue;
+      }
+      // Plain union (exclude tuples): can only replace entire union; deeper traversal needs instance
+      if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && !(schema as any)?.shape && !((schema as any)?.getBaseJsonSchema?.().prefixItems !== undefined)) {
+        if (i < segments.length - 1) {
+          throw new ZexError(pathStr, 'union_path_requires_instance', `Cannot resolve path under union without instance. Use replace().`, undefined, 'instance-based traversal');
+        }
+        return { targetSchema: schema, pathForError: pathStr };
+      }
+      // Object
+      if ((schema as any)?.shape) {
+        const next = (schema as any).shape[String(seg)];
+        if (!next) {
+          throw new ZexError(pathStr, 'unknown_property', `Unknown property '${String(seg)}'`, undefined, 'property defined in schema');
+        }
+        schema = next;
+        continue;
+      }
+      // Record
+      if ((schema as any)?.valueSchema && !(schema as any)?.shape) {
+        schema = (schema as any).valueSchema;
+        continue;
+      }
+      // Array
+      if ((schema as any)?.itemSchema) {
+        const idx = this.parseArrayIndex(seg, pathStr);
+        schema = (schema as any).itemSchema;
+        continue;
+      }
+      // (Tuple handled above)
+      throw new ZexError(pathStr, 'invalid_path', `Cannot traverse into schema at segment '${String(seg)}'`, undefined, 'object/array/record/union');
+    }
+    return { targetSchema: schema, pathForError: pathStr };
+  }
+
+  private resolveForReplace(instance: any, segments: (string | number)[]): {
+    parentContainers: { kind: 'object' | 'array'; value: any; keyOrIndex: string | number }[];
+    leafKeyOrIndex: string | number;
+    leafSchema: any;
+    containerKind: 'object' | 'array';
+  } {
+    let schema: any = this;
+    let value: any = instance;
+    const parents: { kind: 'object' | 'array'; value: any; keyOrIndex: string | number }[] = [];
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i];
+      // Unwrap lazy
+      if ((schema as any)?.getSchema && typeof (schema as any).getSchema === 'function') {
+        schema = (schema as any).getSchema();
+      }
+      // Discriminated union: select variant by instance
+      if ((schema as any)?.discriminatorKey && (schema as any)?.variants) {
+        if (typeof value !== 'object' || value === null) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'type_mismatch', `Expected object for discriminated union`, value, 'object');
+        }
+        const disc = (schema as any).discriminatorKey as string;
+        const discVal = (value as any)[disc];
+        const mapping = new Map<any, any>();
+        for (const v of (schema as any).variants as any[]) {
+          const literal = v.shape?.[disc]?.toJsonSchema?.()?.const;
+          if (literal !== undefined) mapping.set(literal, v);
+        }
+        const chosen = mapping.get(discVal);
+        if (!chosen) throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'invalid_discriminant', `Cannot resolve union variant for discriminator '${disc}'`, discVal, Array.from(mapping.keys()).map(x => JSON.stringify(x)).join(' | '));
+        schema = chosen;
+        // continue without consuming segment (we still need to traverse into the object)
+      }
+      // Plain union: pick variant by current value
+      if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && !(schema as any)?.shape) {
+        let picked: any | undefined = undefined;
+        for (const cand of (schema as any).schemas as any[]) {
+          const res = (cand as any).safeParse(value);
+          if (res?.success) { picked = cand; break; }
+        }
+        if (!picked) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'union_resolution_failed', `Cannot resolve union variant from current instance`, value, 'value matching a union variant');
+        }
+        schema = picked;
+      }
+      // Object traversal
+      if ((schema as any)?.shape) {
+        const key = String(seg);
+        const nextSchema = (schema as any).shape[key];
+        if (!nextSchema) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'unknown_property', `Unknown property '${key}'`, undefined, 'property defined in schema');
+        }
+        if (typeof value !== 'object' || value === null || !(key in (value as any))) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'missing_parent', `Missing parent object/key '${key}' in instance`, value, 'existing parent');
+        }
+        parents.push({ kind: 'object', value, keyOrIndex: key });
+        value = (value as any)[key];
+        schema = nextSchema;
+        continue;
+      }
+      // Record traversal: any key allowed
+      if ((schema as any)?.valueSchema && !(schema as any)?.shape) {
+        const key = String(seg);
+        if (typeof value !== 'object' || value === null || !(key in (value as any))) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'missing_parent', `Missing parent object/key '${key}' in instance`, value, 'existing parent');
+        }
+        parents.push({ kind: 'object', value, keyOrIndex: key });
+        value = (value as any)[key];
+        schema = (schema as any).valueSchema;
+        continue;
+      }
+      // Array traversal
+      if ((schema as any)?.itemSchema) {
+        const idx = this.parseArrayIndex(seg, segments.slice(0, i + 1).map(s => String(s)));
+        if (!Array.isArray(value) || idx < 0 || idx >= value.length) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'index_out_of_range', `Array index ${idx} out of range`, idx, Array.isArray(value) ? `0..${value.length - 1}` : 'array');
+        }
+        parents.push({ kind: 'array', value, keyOrIndex: idx });
+        value = value[idx];
+        schema = (schema as any).itemSchema;
+        continue;
+      }
+      // Tuple traversal
+      if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && (schema as any)?.getBaseJsonSchema?.().prefixItems !== undefined) {
+        const idx = this.parseArrayIndex(seg, segments.slice(0, i + 1).map(s => String(s)));
+        const arr = (schema as any).schemas as any[];
+        if (idx < 0 || idx >= arr.length) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'index_out_of_range', `Tuple index ${idx} out of range`, idx, `0..${arr.length - 1}`);
+        }
+        if (!Array.isArray(value) || idx >= value.length) {
+          throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'missing_parent', `Missing tuple index ${idx} in instance`, value, 'tuple element present');
+        }
+        parents.push({ kind: 'array', value, keyOrIndex: idx });
+        value = value[idx];
+        schema = arr[idx];
+        continue;
+      }
+      throw new ZexError(segments.slice(0, i + 1).map(s => String(s)), 'invalid_path', `Cannot traverse into schema at segment '${String(seg)}'`, undefined, 'object/array/record/union');
+    }
+
+    // Leaf
+    const leafSeg = segments[segments.length - 1];
+    // Unwrap lazy at leaf container
+    if ((schema as any)?.getSchema && typeof (schema as any).getSchema === 'function') {
+      schema = (schema as any).getSchema();
+    }
+    // Discriminated union at leaf container: choose variant by instance
+    if ((schema as any)?.discriminatorKey && (schema as any)?.variants) {
+      if (typeof value !== 'object' || value === null) {
+        throw new ZexError(segments.map(s => String(s)), 'type_mismatch', `Expected object for discriminated union`, value, 'object');
+      }
+      const disc = (schema as any).discriminatorKey as string;
+      const discVal = (value as any)[disc];
+      const mapping = new Map<any, any>();
+      for (const v of (schema as any).variants as any[]) {
+        const literal = v.shape?.[disc]?.toJsonSchema?.()?.const;
+        if (literal !== undefined) mapping.set(literal, v);
+      }
+      const chosen = mapping.get(discVal);
+      if (!chosen) throw new ZexError(segments.map(s => String(s)), 'invalid_discriminant', `Cannot resolve union variant for discriminator '${disc}'`, discVal, Array.from(mapping.keys()).map(x => JSON.stringify(x)).join(' | '));
+      schema = chosen;
+    }
+    // Plain union at leaf container (exclude tuples): pick by instance
+    if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && !(schema as any)?.shape && !((schema as any)?.getBaseJsonSchema?.().prefixItems !== undefined)) {
+      let picked: any | undefined = undefined;
+      for (const cand of (schema as any).schemas as any[]) {
+        const res = (cand as any).safeParse(value);
+        if (res?.success) { picked = cand; break; }
+      }
+      if (!picked) {
+        throw new ZexError(segments.map(s => String(s)), 'union_resolution_failed', `Cannot resolve union variant from current instance`, value, 'value matching a union variant');
+      }
+      schema = picked;
+    }
+
+    // Now determine leaf container kind and leaf schema
+    if ((schema as any)?.shape) {
+      const key = String(leafSeg);
+      const nextSchema = (schema as any).shape[key];
+      if (!nextSchema) {
+        throw new ZexError(segments.map(s => String(s)), 'unknown_property', `Unknown property '${key}'`, undefined, 'property defined in schema');
+      }
+      return { parentContainers: [...parents, { kind: 'object', value, keyOrIndex: key }], leafKeyOrIndex: key, leafSchema: nextSchema, containerKind: 'object' };
+    }
+    if ((schema as any)?.valueSchema && !(schema as any)?.shape) {
+      const key = String(leafSeg);
+      return { parentContainers: [...parents, { kind: 'object', value, keyOrIndex: key }], leafKeyOrIndex: key, leafSchema: (schema as any).valueSchema, containerKind: 'object' };
+    }
+    if ((schema as any)?.itemSchema) {
+      const idx = this.parseArrayIndex(leafSeg, segments.map(s => String(s)));
+      if (!Array.isArray(value) || idx < 0 || idx >= value.length) {
+        throw new ZexError(segments.map(s => String(s)), 'index_out_of_range', `Array index ${idx} out of range`, idx, Array.isArray(value) ? `0..${value.length - 1}` : 'array');
+      }
+      return { parentContainers: [...parents, { kind: 'array', value, keyOrIndex: idx }], leafKeyOrIndex: idx, leafSchema: (schema as any).itemSchema, containerKind: 'array' };
+    }
+    if ((schema as any)?.schemas && Array.isArray((schema as any).schemas) && (schema as any)?.getBaseJsonSchema?.().prefixItems !== undefined) {
+      const idx = this.parseArrayIndex(leafSeg, segments.map(s => String(s)));
+      const arr = (schema as any).schemas as any[];
+      if (idx < 0 || idx >= arr.length) {
+        throw new ZexError(segments.map(s => String(s)), 'index_out_of_range', `Tuple index ${idx} out of range`, idx, `0..${arr.length - 1}`);
+      }
+      if (!Array.isArray(value) || idx >= value.length) {
+        throw new ZexError(segments.map(s => String(s)), 'missing_parent', `Missing tuple index ${idx} in instance`, value, 'tuple element present');
+      }
+      return { parentContainers: [...parents, { kind: 'array', value, keyOrIndex: idx }], leafKeyOrIndex: idx, leafSchema: arr[idx], containerKind: 'array' };
+    }
+    throw new ZexError(segments.map(s => String(s)), 'invalid_path', `Cannot resolve leaf under schema`, undefined, 'object/array/record/tuple');
+  }
+
+  private parseArrayIndex(seg: string | number, pathForError: string[]): number {
+    const s = String(seg);
+    if (!/^\d+$/.test(s)) {
+      throw new ZexError(pathForError, 'invalid_index', `Expected numeric array index, got '${s}'`, s, '0..N');
+    }
+    const idx = parseInt(s, 10);
+    return idx;
+  }
+
   // Internal parse methods with path tracking
   protected _parse(data: unknown, path: PathEntry[]): T {
     // Check for circular references

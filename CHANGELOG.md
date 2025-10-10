@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.4.0] - 2025-10-10
+
+### Added
+- Delta APIs on all Zex types (implemented in `ZexBase`):
+  - `parseDelta(path, value)` / `safeParseDelta(path, value)`
+    - Validates a value against the sub-schema referenced by a JSON Pointer path (supports "", "/", missing leading slash, and RFC 6901 escapes `~0`/`~1`).
+    - Tuple indices, array indices (0-based), record keys, and discriminator key validation supported.
+    - Deep traversal into unions without an instance is rejected; use `replace` instead.
+  - `replace(instance, path, value)` / `safeReplace(instance, path, value)`
+    - Replace-only semantics with full root revalidation (includes `.refine`, required checks, discriminated unions, defaults).
+    - Deletion via `undefined` only for optional object properties; arrays and root cannot be deleted.
+    - Array indices must be in-range; no append.
+
+### Tests
+- New test suites:
+  - `tests/unit/special/delta-parse.test.ts`: coverage for root, path normalization, escapes, arrays, tuples, records, unions, discriminated unions, safe variant.
+  - `tests/unit/special/delta-replace.test.ts`: coverage for root/nested replace, optional deletion, arrays/tuples/records, cross-field refine, DU updates, and failures.
+- Test runner updated to import both new suites.
+
+### Notes
+- No changes to public constructors; APIs are instance methods on schemas.
+- Strict by default is preserved; unknown keys continue to error (no implicit strip in delta flows).
+
 ## [0.3.1] - 2025-10-09
 
 ### Added
