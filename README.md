@@ -259,6 +259,29 @@ const urlJson = urlSchema.toJSONSchema();
 // Result: { "type": "string", "format": "uri-reference" }
 ```
 
+### Custom Refinements (neu)
+```typescript
+// Refine fügt eine benutzerdefinierte Validierung hinzu (zur Laufzeit; kein JSON Schema Output)
+const User = zex.object({
+  profile: zex.object({
+    contacts: zex.array(zex.union(
+      zex.object({ kind: zex.literal('email'), value: zex.string().email() }),
+      zex.object({ kind: zex.literal('phone'), value: zex.string().pattern('^\\\+?[0-9]{7,15}$') })
+    ))
+  }),
+  settings: zex.object({ theme: zex.enum(['light', 'dark']), flags: zex.record(zex.boolean()) })
+})
+// mindestens ein E-Mail-Kontakt erforderlich
+.refine(u => Array.isArray((u as any).profile?.contacts) && (u as any).profile.contacts.some((c: any) => c?.kind === 'email'), 'At least one email contact required')
+// dark Theme erfordert flags.darkMode === true
+.refine(u => (u as any).settings?.theme !== 'dark' || (u as any).settings?.flags?.darkMode === true, 'flags.darkMode must be true for dark theme');
+
+User.parse({
+  profile: { contacts: [ { kind: 'email', value: 'a@b.de' } ] },
+  settings: { theme: 'dark', flags: { darkMode: true } }
+}); // ✅
+```
+
 #### Buffer Format Support
 Binary data uses a custom format for clear semantics:
 

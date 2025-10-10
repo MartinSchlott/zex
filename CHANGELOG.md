@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.3.1] - 2025-10-09
+
+### Added
+- Custom refinement support via `refine(predicate, message?)` on all Zex types
+  - Implements `RefineValidator` executed during parse like built-in validators
+  - Runtime-only; no JSON Schema emission for custom refinements
+- Unit test: deep nested refine scenarios under `tests/unit/special/refine.test.ts`
+
+### Documentation
+- README: Added `refine` usage example and notes on runtime-only behavior
+
+### Notes
+- No breaking changes; immutable chaining preserved
+
 ## [0.3.0] - 2025-09-26
 
 ### Added

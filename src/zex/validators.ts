@@ -243,3 +243,29 @@ export class ArrayMaxLengthValidator implements Validator {
     return { maxItems: this.maxLength };
   }
 } 
+
+// Generic refine validator (custom predicate)
+export class RefineValidator implements Validator {
+  constructor(
+    private predicate: (value: unknown) => boolean,
+    private message?: string
+  ) {}
+
+  validate(value: unknown): ValidationResult {
+    try {
+      const ok = this.predicate(value);
+      if (!ok) {
+        return { success: false, error: this.message || 'Custom validation failed' };
+      }
+      return { success: true, data: value };
+    } catch (err) {
+      // Defensive: predicate threw
+      return { success: false, error: this.message || (err instanceof Error ? err.message : 'Custom validation failed') };
+    }
+  }
+
+  getJsonSchema(): Partial<JsonSchema> {
+    // Custom runtime-only refinement has no JSON Schema representation
+    return {};
+  }
+}

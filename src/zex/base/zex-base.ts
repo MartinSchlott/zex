@@ -2,6 +2,7 @@
 // =============================================================================
 
 import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseContext, ZexError } from '../types.js';
+import { RefineValidator } from '../validators.js';
 import { beginExportCtx, endExportCtx, getCurrentExportCtx } from './export-context.js';
 
 // Base class for all Zex types with Flag-Tracking
@@ -393,5 +394,10 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
 
   protected getMeta(): Record<string, unknown> {
     return this.config.meta;
+  }
+
+  // Custom refinement similar to Zod's refine
+  refine(predicate: (value: unknown) => boolean, message?: string): this {
+    return this.addValidator(new RefineValidator(predicate, message));
   }
 }
