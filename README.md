@@ -21,7 +21,7 @@ After losing two days fighting with Zod 4 migration issues, I decided to build m
 
 ### The Zex Solution
 
-Built in **one day** using Claude, ChatGPT, Gemini, and Cursor, Zex addresses these pain points:
+Built using Claude, ChatGPT, Gemini, and Cursor, Zex addresses these pain points:
 
 - ✅ **Strict by default**: Objects reject unknown properties unless explicitly allowed. 
 - ✅ **Binary data support**: First-class `buffer()` type with MIME type support

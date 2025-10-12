@@ -32,15 +32,25 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
       const keys = Object.keys(data);
       if (keys.length === 0) return [];
       if (keys.every(k => /^\d+$/.test(k))) {
+        // Accept both 1-based (1..N) and 0-based (0..N-1) contiguous numeric keys
         const sortedKeys = keys.sort((a, b) => parseInt(a) - parseInt(b));
-        const result: unknown[] = [];
-        for (let i = 0; i < sortedKeys.length; i++) {
-          const key = sortedKeys[i];
-          const index = parseInt(key);
-          if (index !== i + 1) return data;
-          result.push((this.itemSchema as any).transformLua((data as any)[key]));
+        const ints = sortedKeys.map(k => parseInt(k));
+        if (ints.length > 0) {
+          const isZeroBased = ints[0] === 0;
+          const isOneBased = ints[0] === 1;
+          if (isZeroBased || isOneBased) {
+            for (let i = 0; i < ints.length; i++) {
+              const expected = isZeroBased ? i : i + 1;
+              if (ints[i] !== expected) return data; // has holes or wrong base
+            }
+            const result: unknown[] = [];
+            for (let i = 0; i < sortedKeys.length; i++) {
+              const key = sortedKeys[i];
+              result.push((this.itemSchema as any).transformLua((data as any)[key]));
+            }
+            return result;
+          }
         }
-        return result;
       }
     }
     if (Array.isArray(data)) {

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.4.1] - 2025-10-12
+
+### Fixed
+- Lua parseFromLua for arrays: accept 0-based contiguous numeric keys in addition to 1-based
+  - Tables with keys "0".."N-1" are now converted to JS arrays (like "1".."N" already were)
+  - Non-numeric or non-contiguous keys remain objects and will fail when an array is required
+  - Tuple behavior unchanged
+
 ## [0.4.0] - 2025-10-10
 
 ### Added

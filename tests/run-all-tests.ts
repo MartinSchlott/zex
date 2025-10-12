@@ -51,6 +51,7 @@ await runImport('./behavior/lazy-display.test.ts');
 await runImport('./behavior/strict-vs-strip-lua.test.ts');
 await runImport('./behavior/object-partial-omit.test.ts');
 await runImport('./behavior/object-targeted-strip.test.ts');
+await runImport('./behavior/lua-0based-array.test.ts');
 
 // JSON Schema
 await runImport('./jsonschema/to-from-roundtrip.test.ts');
