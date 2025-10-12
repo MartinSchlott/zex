@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.4.2] - 2025-10-12
+
+### Fixed
+- Enriched error strings for safeParse/safeParseFromLua to include path and type summary
+  - Format: "Error parsing structure at '{path}': Expected {Expected}, got {Got} — {details}"
+  - No API change; return type remains `{ success: false, error: string }`
+
 ## [0.4.1] - 2025-10-12
 
 ### Fixed

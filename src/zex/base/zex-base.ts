@@ -173,6 +173,18 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
       const result = this.parse(data, context);
       return { success: true, data: result };
     } catch (error) {
+      if (error instanceof ZexError) {
+        const pathStr = error.path.length > 0 ? error.path.join('.') : 'root';
+        const expected = (error.expected ? String(error.expected) : (error.message.match(/Expected\s+([^,\n]+)/i)?.[1] || 'value')).trim();
+        const got = (() => {
+          const r = error.received;
+          if (Array.isArray(r)) return 'Array';
+          const t = typeof r;
+          return t === 'object' && r !== null ? 'object' : t;
+        })();
+        const enriched = `Error parsing structure at '${pathStr}': Expected ${expected[0]?.toUpperCase()}${expected.slice(1)}, got ${got} — ${error.message}`;
+        return { success: false, error: enriched };
+      }
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -194,6 +206,18 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
       const result = this.parseFromLua(luaData, context);
       return { success: true, data: result };
     } catch (error) {
+      if (error instanceof ZexError) {
+        const pathStr = error.path.length > 0 ? error.path.join('.') : 'root';
+        const expected = (error.expected ? String(error.expected) : (error.message.match(/Expected\s+([^,\n]+)/i)?.[1] || 'value')).trim();
+        const got = (() => {
+          const r = error.received;
+          if (Array.isArray(r)) return 'Array';
+          const t = typeof r;
+          return t === 'object' && r !== null ? 'object' : t;
+        })();
+        const enriched = `Error parsing structure at '${pathStr}': Expected ${expected[0]?.toUpperCase()}${expected.slice(1)}, got ${got} — ${error.message}`;
+        return { success: false, error: enriched };
+      }
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
