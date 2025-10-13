@@ -55,8 +55,8 @@ export class ZexString<TFlags extends Record<string, boolean> = {}> extends ZexB
         }
       }
     } catch (err) {
-      // Propagate decoding failure so union logic or caller can decide
-      throw err;
+      // Do not throw from transform; return original data and let schema parsing decide
+      return data;
     }
     return data;
   }

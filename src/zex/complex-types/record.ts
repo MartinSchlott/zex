@@ -48,7 +48,7 @@ export class ZexRecord<T extends ZexBase<any, any>> extends ZexBase<Record<strin
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
       const result = (this.valueSchema as any).safeParse(value);
       if (!result.success) {
-        return { success: false, error: `Property '${key}': ${result.error}` };
+        return { success: false, error: `Property '${key}': ${String(result.error)}` };
       }
     }
 

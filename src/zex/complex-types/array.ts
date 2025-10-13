@@ -75,17 +75,20 @@ export class ZexArray<T extends ZexBase<any, any>> extends ZexBase<InferProperty
     }
     
     return validatedData.map((item, index) => {
-      const elementPath = [...path, {
+      const elementPath: PathEntry[] = [...path, {
         type: 'array',
         index,
         schema: this.itemSchema,
         description: (this.itemSchema as any).config?.meta?.description
-      }];
-      try {
-        return (this.itemSchema as any)._parse(item, elementPath);
-      } catch (err) {
-        throw err;
-      }
+      } as PathEntry];
+      const res = (this.itemSchema as any)._tryParse(item, elementPath);
+      if (res && res.success) return res.data;
+      // escalate single element error
+      throw (res && !res.success && res.error) || new ZexError(
+        [],
+        'validation_failed',
+        'Array element failed validation'
+      );
     });
   }
 

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.5.0] - 2025-10-13
+
+### Breaking
+- safe* APIs now return structured ZexResult<T> instead of string error
+  - `{ success: true, data } | { success: false, error: ZexError }`
+  - `ZexError` is string-coercible via `toString()` and `Symbol.toPrimitive('string')`
+- Internal parsing no longer uses exceptions as control flow
+  - Unions/Discriminated Unions use result flow for variant selection
+  - Arrays/Tuples/Objects parse children/defaults via internal `_tryParse`
+  - Delta/Replace provide non-throwing `_tryParseDelta`/`_tryReplace`; safe* variants use them
+  - String `transformLua` does not throw on UTF-8 decode errors; value is preserved and validated downstream
+
+### Fixed/Improved
+- Enriched safe* error strings remain readable via string coercion
+- Cleaner stepping in debuggers (no per-variant try/catch in unions)
+
 ## [0.4.2] - 2025-10-12
 
 ### Fixed

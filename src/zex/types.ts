@@ -27,6 +27,11 @@ export type ValidationResult =
   | { success: true; data: unknown }
   | { success: false; error: string };
 
+// Structured result for public safe* APIs
+export type ZexResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: ZexError };
+
 export type ZexConfig = {
   optional: boolean;
   nullable: boolean;
@@ -66,7 +71,8 @@ export class ZexError extends Error {
     public code: string,
     message: string,
     public received?: unknown,
-    public expected?: string
+    public expected?: string,
+    public innerErrors?: ZexError[]
   ) {
     super(message);
     this.name = 'ZexError';
@@ -75,5 +81,10 @@ export class ZexError extends Error {
   toString(): string {
     const pathStr = this.path.length > 0 ? this.path.join('.') : 'root';
     return `ZexError at ${pathStr}: ${this.message}`;
+  }
+
+  [Symbol.toPrimitive](hint: string) {
+    if (hint === 'string') return this.toString();
+    return this.toString();
   }
 } 

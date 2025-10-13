@@ -22,7 +22,7 @@ const strictRes = StrictSchema.safeParseFromLua(luaObj);
 if (strictRes.success) {
   console.error('❌ strict should fail on unknown key');
 } else {
-  console.log('✅ strict failed as expected:', strictRes.error.split('\n')[0]);
+  console.log('✅ strict failed as expected:', String(strictRes.error).split('\n')[0]);
 }
 
 // strip should succeed and remove x

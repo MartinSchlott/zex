@@ -1,7 +1,7 @@
 // unions.ts - Union and Discriminated Union implementations (extracted)
 // =============================================================================
 
-import { JsonSchema, PathEntry, ZexConfig, ZexError } from './types.js';
+import { JsonSchema, PathEntry, ZexConfig, ZexError, ZexResult } from './types.js';
 import { ZexBase } from './base/index.js';
 import { ZexObject } from './complex-types/index.js';
 import { decodePossibleUtf8Bytes } from './utils/lua.js';
@@ -39,7 +39,7 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
 
   protected validateType(data: unknown): { success: true } | { success: false; error: string } {
     for (const schema of this.schemas) {
-      const result = (schema as any).safeParse(data);
+      const result = (schema as any).safeParse(data) as ZexResult<any>;
       if (result.success) {
         return { success: true };
       }
@@ -52,19 +52,14 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
     const errors: ZexError[] = [];
     for (let i = 0; i < this.schemas.length; i++) {
       const schema = this.schemas[i];
-      try {
-        const unionPath = [...path, {
-          type: 'union' as const,
-          schema,
-          description: (schema as any).config?.meta?.description
-        }];
-        const result = (schema as any)._parse(data, unionPath);
-        return result;
-      } catch (error) {
-        if (error instanceof ZexError) {
-          errors.push(error);
-        }
-      }
+      const unionPath = [...path, {
+        type: 'union' as const,
+        schema,
+        description: (schema as any).config?.meta?.description
+      }];
+      const res = (schema as any)._tryParse(data, unionPath) as ZexResult<any>;
+      if (res.success) return res.data;
+      errors.push(res.error);
     }
     let message = 'No union variant matched.';
     if (errors.length > 0) {
@@ -81,7 +76,8 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
           'union_mismatch',
           `No union variant matched. Got ${typeof data}`,
           data,
-          'one of the union variants'
+          'one of the union variants',
+          errors
         );
     bestError.message = message;
     throw bestError;
@@ -210,7 +206,12 @@ export class ZexDiscriminatedUnion<
       schema,
       description: (schema as any).config?.meta?.description
     }];
-    return (schema as any)._parse(validatedData, unionPath);
+    const res = (schema as any)._tryParse(validatedData, unionPath) as ZexResult<any>;
+    if (res.success) return res.data;
+    // enrich with union message
+    const err = res.error;
+    err.message = `No union variant matched.\nUnion alternative errors:\n- Alternative 0: ${err.message}`;
+    throw err;
   }
 }
 

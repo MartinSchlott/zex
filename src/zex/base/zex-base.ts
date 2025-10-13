@@ -1,7 +1,7 @@
 // zex-base.ts - Base class for all Zex types with Flag-Tracking
 // =============================================================================
 
-import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseContext, ZexError } from '../types.js';
+import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseContext, ZexError, ZexResult } from '../types.js';
 import { RefineValidator } from '../validators.js';
 import { beginExportCtx, endExportCtx, getCurrentExportCtx } from './export-context.js';
 
@@ -168,7 +168,7 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this._parse(data, path);
   }
 
-  safeParse(data: unknown, context?: ParseContext): { success: true; data: T } | { success: false; error: string } {
+  safeParse(data: unknown, context?: ParseContext): ZexResult<T> {
     try {
       const result = this.parse(data, context);
       return { success: true, data: result };
@@ -183,9 +183,12 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
           return t === 'object' && r !== null ? 'object' : t;
         })();
         const enriched = `Error parsing structure at '${pathStr}': Expected ${expected[0]?.toUpperCase()}${expected.slice(1)}, got ${got} — ${error.message}`;
-        return { success: false, error: enriched };
+        // Return structured error while keeping string coercion useful
+        const structured = new ZexError(error.path, error.code, enriched, error.received, error.expected, error.innerErrors);
+        return { success: false, error: structured };
       }
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      const generic = new ZexError([], 'unknown_error', error instanceof Error ? error.message : String(error));
+      return { success: false, error: generic };
     }
   }
 
@@ -201,7 +204,7 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this._parseFromLua(luaData, path);
   }
 
-  safeParseFromLua(luaData: unknown, context?: ParseContext): { success: true; data: T } | { success: false; error: string } {
+  safeParseFromLua(luaData: unknown, context?: ParseContext): ZexResult<T> {
     try {
       const result = this.parseFromLua(luaData, context);
       return { success: true, data: result };
@@ -216,9 +219,11 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
           return t === 'object' && r !== null ? 'object' : t;
         })();
         const enriched = `Error parsing structure at '${pathStr}': Expected ${expected[0]?.toUpperCase()}${expected.slice(1)}, got ${got} — ${error.message}`;
-        return { success: false, error: enriched };
+        const structured = new ZexError(error.path, error.code, enriched, error.received, error.expected, error.innerErrors);
+        return { success: false, error: structured };
       }
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      const generic = new ZexError([], 'unknown_error', error instanceof Error ? error.message : String(error));
+      return { success: false, error: generic };
     }
   }
 
@@ -236,13 +241,22 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return (targetSchema as any).parse(value);
   }
 
-  safeParseDelta(path: string, value: unknown): { success: true; data: unknown } | { success: false; error: string } {
+  _tryParseDelta(path: string, value: unknown): ZexResult<unknown> {
     try {
-      const data = this.parseDelta(path, value);
-      return { success: true, data };
+      const segments = this.normalizeAndSplitPointer(path);
+      if (segments.length === 0) {
+        return (this as any)._tryParse(value, []);
+      }
+      const { targetSchema } = this.resolveSchemaForDelta(segments);
+      return (targetSchema as any)._tryParse(value, []);
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      const z = error instanceof ZexError ? error : new ZexError([], 'unknown_error', error instanceof Error ? error.message : String(error));
+      return { success: false, error: z };
     }
+  }
+
+  safeParseDelta(path: string, value: unknown): ZexResult<unknown> {
+    return this._tryParseDelta(path, value);
   }
 
   // replace: apply replace-only delta at path to an existing instance, returning a new validated instance
@@ -319,13 +333,18 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return this.parse(updated);
   }
 
-  safeReplace(instance: T, path: string, value: unknown): { success: true; data: T } | { success: false; error: string } {
+  _tryReplace(instance: T, path: string, value: unknown): ZexResult<T> {
     try {
       const data = this.replace(instance, path, value);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      const z = error instanceof ZexError ? error : new ZexError([], 'unknown_error', error instanceof Error ? error.message : String(error));
+      return { success: false, error: z };
     }
+  }
+
+  safeReplace(instance: T, path: string, value: unknown): ZexResult<T> {
+    return this._tryReplace(instance, path, value);
   }
 
   // Internal helpers for delta/replace
@@ -660,9 +679,38 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     return data as T;
   }
 
+  // Internal non-throwing helpers (transition to full result-based parsing)
+  protected _tryParse(data: unknown, path: PathEntry[]): ZexResult<T> {
+    try {
+      const out = this._parse(data, path);
+      return { success: true, data: out };
+    } catch (error) {
+      const z = error instanceof ZexError ? error : new ZexError(
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
+        'unknown_error',
+        error instanceof Error ? error.message : String(error)
+      );
+      return { success: false, error: z };
+    }
+  }
+
   protected _parseFromLua(luaData: unknown, path: PathEntry[]): T {
     const transformedData = this.transformLua(luaData);
     return this._parse(transformedData, path);
+  }
+
+  protected _tryParseFromLua(luaData: unknown, path: PathEntry[]): ZexResult<T> {
+    try {
+      const transformedData = this.transformLua(luaData);
+      return this._tryParse(transformedData, path);
+    } catch (error) {
+      const z = error instanceof ZexError ? error : new ZexError(
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
+        'unknown_error',
+        error instanceof Error ? error.message : String(error)
+      );
+      return { success: false, error: z };
+    }
   }
 
   // Path tracking utilities

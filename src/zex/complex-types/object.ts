@@ -245,9 +245,12 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
         const value = (validatedData as any)[key];
         if (value === undefined) {
           if ((schema as any).config?.defaultValue !== undefined) {
-            // Trigger default when explicitly provided as undefined
-            result[key] = (schema as any)._parse(undefined, fieldPath);
-            continue;
+            const defRes = (schema as any)._tryParse(undefined, fieldPath);
+            if (defRes && defRes.success) {
+              result[key] = defRes.data;
+              continue;
+            }
+            throw (defRes && !defRes.success && defRes.error) || new ZexError(path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))), 'validation_failed', `Missing required field '${key}'`);
           }
           if (this.allOptional || (schema as any).config?.optional) {
             // Omit missing optional keys entirely
@@ -262,7 +265,12 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
             'required field from schema'
           );
         }
-        result[key] = (schema as any)._parse(value, fieldPath);
+        const parsed = (schema as any)._tryParse(value, fieldPath);
+        if (parsed && parsed.success) {
+          result[key] = parsed.data;
+        } else {
+          throw (parsed && !parsed.success && parsed.error) || new ZexError([], 'validation_failed', `Field '${key}' failed validation`);
+        }
       } else if (!this.allOptional && !(schema as any).config?.optional && (schema as any).config?.defaultValue === undefined) {
         // Missing required field - throw structured error
         throw new ZexError(
@@ -285,7 +293,12 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
             schema,
             description: (schema as any).config?.meta?.description
           }];
-          result[key] = (schema as any)._parse(undefined, fieldPath);
+          const defRes = (schema as any)._tryParse(undefined, fieldPath);
+          if (defRes && defRes.success) {
+            result[key] = defRes.data;
+          } else {
+            throw (defRes && !defRes.success && defRes.error) || new ZexError([], 'validation_failed', `Defaulted field '${key}' failed validation`);
+          }
         }
       }
     }

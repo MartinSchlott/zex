@@ -64,20 +64,12 @@ export class ZexTuple<T extends readonly ZexBase<any, any>[]> extends ZexBase<In
         description: (this.schemas[i] as any).config?.meta?.description
       }];
       
-      try {
-        const element = (this.schemas[i] as any)._parse(validatedData[i], elementPath);
-        result.push(element);
-      } catch (error) {
-        if (error instanceof ZexError) {
-          throw error;
-        }
-        throw new ZexError(
-          path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
-          'tuple_element_error',
-          `Element at index ${i}: ${error instanceof Error ? error.message : String(error)}`,
-          validatedData[i],
-          `element matching schema at index ${i}`
-        );
+      const res = (this.schemas[i] as any)._tryParse(validatedData[i], elementPath);
+      if (res && res.success) {
+        result.push(res.data);
+      } else {
+        const err = res && !res.success ? res.error : new ZexError([], 'tuple_element_error', `Element at index ${i} failed validation`);
+        throw err;
       }
     }
     
