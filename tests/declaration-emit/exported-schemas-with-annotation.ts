@@ -34,11 +34,13 @@ export const CatSchema: ZexTypeAny = zex.object({
 // This should work even with annotated variants (after our fix)
 export const PetSchema = zex.discriminatedUnion('type', DogSchema, CatSchema);
 
-// Test with ZexSchemaPublic as well
-export const BirdSchema: ZexSchemaPublic = zex.object({
+// Test with ZexSchemaPublic as well (demonstrating proper usage pattern)
+const BirdSchemaInternal = zex.object({
   type: zex.literal('bird'),
   chirps: zex.boolean()
 });
+export type Bird = zex.infer<typeof BirdSchemaInternal>;
+export const BirdSchema: ZexSchemaPublic<Bird> = BirdSchemaInternal;
 
 export const AllPetsSchema = zex.discriminatedUnion('type', DogSchema, CatSchema, BirdSchema);
 

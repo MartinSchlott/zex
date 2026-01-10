@@ -91,8 +91,12 @@ export namespace zex {
   
   // Public schema type for declaration emit compatibility
   // This type can be used to annotate exported schemas to avoid TS2742
-  // while maintaining compatibility with discriminatedUnion and other type checks
-  export type ZexSchemaPublic = ZexBase<any, any>;
+  // while maintaining type information and compatibility with discriminatedUnion
+  // Usage:
+  //   const FooSchemaInternal = zex.object({ name: zex.string() });
+  //   export type Foo = zex.infer<typeof FooSchemaInternal>;
+  //   export const FooSchema: zex.ZexSchemaPublic<Foo> = FooSchemaInternal;
+  export type ZexSchemaPublic<T = any, Flags extends Record<string, boolean> = any> = ZexBase<T, Flags>;
 }
 
 
@@ -113,5 +117,9 @@ export type ZexTypeAny = ZexBase<any, any>;
 
 // Public schema type for declaration emit compatibility
 // This type can be used to annotate exported schemas to avoid TS2742
-// while maintaining compatibility with discriminatedUnion and other type checks
-export type ZexSchemaPublic = ZexBase<any, any>; 
+// while maintaining type information and compatibility with discriminatedUnion
+// Usage:
+//   const FooSchemaInternal = zex.object({ name: zex.string() });
+//   export type Foo = zex.infer<typeof FooSchemaInternal>;
+//   export const FooSchema: ZexSchemaPublic<Foo> = FooSchemaInternal;
+export type ZexSchemaPublic<T = any, Flags extends Record<string, boolean> = any> = ZexBase<T, Flags>; 

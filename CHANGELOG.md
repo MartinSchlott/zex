@@ -9,13 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.6.1] - 2025-01-10
+
+### Fixed
+- **`ZexSchemaPublic` is now generic** - Bugfix because the KIs messed it up in 0.6.0
+  - Changed from `ZexSchemaPublic = ZexBase<any, any>` to `ZexSchemaPublic<T = any, Flags extends Record<string, boolean> = any>`
+  - Now preserves type information: `zex.infer<typeof Schema>` returns the correct type instead of `any`
+  - Correct usage pattern:
+    ```typescript
+    const FooSchemaInternal = zex.object({ name: zex.string() });
+    export type Foo = zex.infer<typeof FooSchemaInternal>;
+    export const FooSchema: ZexSchemaPublic<Foo> = FooSchemaInternal;
+    ```
+
 ## [0.6.0] - 2025-01-10
 
 ### Added
 - **Declaration Emit Compatibility**: Support for TypeScript declaration emit (`declaration: true`) without TS2742 errors
-  - New `ZexSchemaPublic` type alias for annotating exported schemas
-  - Available as `zex.ZexSchemaPublic` and direct export `ZexSchemaPublic`
-  - Can be used to avoid TS2742 errors when exporting complex schemas
+  - New generic `ZexSchemaPublic<T, Flags>` type alias for annotating exported schemas
+  - Available as `zex.ZexSchemaPublic<T>` and direct export `ZexSchemaPublic<T>`
+  - Preserves type information: `zex.infer<typeof Schema>` returns the correct type, not `any`
+  - Usage pattern:
+    ```typescript
+    const FooSchemaInternal = zex.object({ name: zex.string() });
+    export type Foo = zex.infer<typeof FooSchemaInternal>;
+    export const FooSchema: ZexSchemaPublic<Foo> = FooSchemaInternal;
+    ```
 
 ### Changed
 - **`discriminatedUnion` now accepts `ZexTypeAny`/`ZexSchemaPublic` variants**
