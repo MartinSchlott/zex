@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.6.2] - 2025-01-10
+
+### Fixed
+- **Export type helpers for declaration emit compatibility**
+  - Exported `InferProperty`, `InferObjectType`, and `InferTuple` from main `zex` export
+  - Fixes TS2742 errors when exporting schemas directly without `ZexSchemaPublic<T>` annotation
+  - These types were already exported from `complex-types/index.ts` but missing from main export
+  - Now TypeScript can portably reference these types when generating `.d.ts` files
+- **Export missing basic types**
+  - Added `ZexJson`, `ZexFunction`, and `ZexTValue` to main export
+  - Fixes TS2742 errors when exporting schemas that use `zex.json()`, `zex.function()`, or `zex.tvalue()`
+  - These types were already available but missing from the main export
+
 ## [0.6.1] - 2025-01-10
 
 ### Fixed

@@ -106,11 +106,14 @@ export { ZexError } from './types.js';
 
 // Re-export classes for external use (as values and types)
 export { ZexBase } from './base/index.js';
-export { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer } from './basic-types.js';
+export { ZexString, ZexNumber, ZexBoolean, ZexAny, ZexEnum, ZexNull, ZexBuffer, ZexFunction, ZexTValue, ZexJson } from './basic-types.js';
 export { ZexArray, ZexObject, ZexRecord, ZexTuple } from './complex-types/index.js';
 export { ZexLiteral } from './complex-types/index.js';
 export { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
 export { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
+
+// Re-export type helpers for declaration emit compatibility
+export type { InferProperty, InferObjectType, InferTuple } from './complex-types/index.js';
 
 // Type aliases for better developer experience
 export type ZexTypeAny = ZexBase<any, any>;
