@@ -89,7 +89,7 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
 // =============================================================================
 export class ZexDiscriminatedUnion<
   K extends string,
-  T extends readonly ZexObject<Record<string, ZexBase<any, any>>>[]
+  T extends readonly (ZexObject<Record<string, ZexBase<any, any>>> | ZexBase<any, any>)[]
 > extends ZexBase<
   T[number] extends ZexBase<infer U, infer Flags>
     ? (Flags extends { nullable: true } ? U | null : U) extends infer FinalU
@@ -110,6 +110,10 @@ export class ZexDiscriminatedUnion<
     this.valueToSchema = new Map();
     for (let i = 0; i < variants.length; i++) {
       const variant = variants[i];
+      // Runtime check: ensure variant is actually a ZexObject
+      if (!(variant instanceof ZexObject)) {
+        throw new Error(`discriminatedUnion: Variant ${i} is not a ZexObject schema. Got ${variant?.constructor?.name || typeof variant}`);
+      }
       const shape = (variant as ZexObject<Record<string, ZexBase<any, any>>>).shape as Record<string, ZexBase<any, any>>;
       if (!shape || typeof shape !== 'object') {
         throw new Error(`discriminatedUnion: Variant ${i} is not an object schema`);

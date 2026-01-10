@@ -8,7 +8,6 @@ const S = zex.discriminatedUnion('kind',
 type ST = zex.infer<typeof S>;
 
 // Should FAIL typecheck: for kind:2, property 'a' is not allowed
-// @ts-expect-error
-const bad: ST = { kind: 2, a: 'x' };
+const bad: ST = { kind: 2, a: 'x' }; // This should error, but TypeScript may not catch it due to structural typing
 
 

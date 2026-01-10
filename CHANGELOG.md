@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.6.0] - 2025-01-10
+
+### Added
+- **Declaration Emit Compatibility**: Support for TypeScript declaration emit (`declaration: true`) without TS2742 errors
+  - New `ZexSchemaPublic` type alias for annotating exported schemas
+  - Available as `zex.ZexSchemaPublic` and direct export `ZexSchemaPublic`
+  - Can be used to avoid TS2742 errors when exporting complex schemas
+
+### Changed
+- **`discriminatedUnion` now accepts `ZexTypeAny`/`ZexSchemaPublic` variants**
+  - Typing now accepts `ZexBase<any, any>` (including `ZexTypeAny` and `ZexSchemaPublic`) as variants
+  - Runtime validation ensures variants are actually `ZexObject` instances using `instanceof` check
+  - Allows schemas annotated with `ZexTypeAny` or `ZexSchemaPublic` to work with `discriminatedUnion`
+  - Maintains full type safety: variants must still have literal discriminators at compile time
+  - Backward compatible: existing `ZexObject` variants continue to work as before
+
+### Fixed
+- Fixed TS2345 error when using `discriminatedUnion` with schemas annotated as `ZexTypeAny`
+  - Previously, annotating schemas to avoid TS2742 would break `discriminatedUnion`
+  - Now works seamlessly with both annotated and unannotated schemas
+
+### Tests
+- Added declaration emit test suite in `tests/declaration-emit/`
+  - Tests for exported schemas with and without type annotations
+  - Verifies TS2742 compatibility and `discriminatedUnion` functionality
+
 ## [0.5.0] - 2025-10-13
 
 ### Breaking

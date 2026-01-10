@@ -35,12 +35,14 @@ export const zex = {
   lazy: <T>(getSchema: () => ZexBase<T>) => new ZexLazy(getSchema),
   discriminatedUnion: <
     K extends string,
-    T extends readonly ZexObject<Record<string, ZexBase<any, any>>>[]
+    T extends readonly (ZexObject<Record<string, ZexBase<any, any>>> | ZexBase<any, any>)[]
   >(
     discriminator: K,
     ...variants: T & {
       [I in keyof T]: T[I] extends ZexObject<infer S>
         ? S[K] extends ZexLiteral<any> ? T[I] : never
+        : T[I] extends ZexBase<any, any>
+        ? T[I] // Accept ZexBase/ZexTypeAny, runtime will check it's actually a ZexObject
         : never
     }
   ) => new ZexDiscriminatedUnion(discriminator, variants),
@@ -86,6 +88,11 @@ export namespace zex {
   
   // Type aliases for better developer experience
   export type ZexTypeAny = ZexBase<any, any>;
+  
+  // Public schema type for declaration emit compatibility
+  // This type can be used to annotate exported schemas to avoid TS2742
+  // while maintaining compatibility with discriminatedUnion and other type checks
+  export type ZexSchemaPublic = ZexBase<any, any>;
 }
 
 
@@ -102,4 +109,9 @@ export { ZexUnion, ZexDiscriminatedUnion } from './unions.js';
 export { ZexUri, ZexUrl, ZexJsonSchema } from './special-types.js';
 
 // Type aliases for better developer experience
-export type ZexTypeAny = ZexBase<any, any>; 
+export type ZexTypeAny = ZexBase<any, any>;
+
+// Public schema type for declaration emit compatibility
+// This type can be used to annotate exported schemas to avoid TS2742
+// while maintaining compatibility with discriminatedUnion and other type checks
+export type ZexSchemaPublic = ZexBase<any, any>; 

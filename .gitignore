@@ -10,6 +10,9 @@ temp/
 .DS_Store
 **/.DS_Store
 
+# Test output
+tests/declaration-emit/declaration-emit-dist/
+
 # Environment
 .env
 .env.local
