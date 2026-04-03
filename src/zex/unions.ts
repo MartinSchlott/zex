@@ -31,6 +31,11 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
   }
 
   protected transformLua(data: unknown): unknown {
+    // For unions, transformLua is best-effort: try each schema's transform
+    // and return the first that doesn't throw. Since most transforms don't
+    // throw, this effectively returns the first schema's transform result.
+    // The real Lua matching happens in _parseFromLua which combines
+    // transform + validation per schema.
     for (const schema of this.schemas) {
       try { return (schema as any).transformLua(data); } catch {}
     }
@@ -48,7 +53,7 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
     return { success: false, error: `Value does not match any union type. Got ${dataType}` };
   }
 
-  protected _parse(data: unknown, path: PathEntry[]): any {
+  private _matchSchemas(data: unknown, path: PathEntry[], tryParseFn: (schema: any, unionPath: PathEntry[]) => ZexResult<any>): any {
     const errors: ZexError[] = [];
     for (let i = 0; i < this.schemas.length; i++) {
       const schema = this.schemas[i];
@@ -57,7 +62,7 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
         schema,
         description: (schema as any).config?.meta?.description
       }];
-      const res = (schema as any)._tryParse(data, unionPath) as ZexResult<any>;
+      const res = tryParseFn(schema, unionPath);
       if (res.success) return res.data;
       errors.push(res.error);
     }
@@ -81,6 +86,20 @@ export class ZexUnion<T extends readonly ZexBase<any, any>[]> extends ZexBase<
         );
     bestError.message = message;
     throw bestError;
+  }
+
+  protected _parse(data: unknown, path: PathEntry[]): any {
+    return this._matchSchemas(data, path, (schema, unionPath) =>
+      (schema as any)._tryParse(data, unionPath) as ZexResult<any>
+    );
+  }
+
+  // Override _parseFromLua: for each schema, transform + validate together.
+  // This ensures the correct schema's transform is used, not just the first one.
+  protected _parseFromLua(luaData: unknown, path: PathEntry[]): any {
+    return this._matchSchemas(luaData, path, (schema, unionPath) =>
+      (schema as any)._tryParseFromLua(luaData, unionPath) as ZexResult<any>
+    );
   }
 }
 

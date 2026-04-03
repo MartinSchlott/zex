@@ -1,4 +1,4 @@
-# Changelog Archive
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -9,337 +9,145 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.6.3] - 2025-04-03
+
+### Fixed
+- Circular reference detection for self-referencing `lazy()` schemas (was causing infinite recursion)
+- Union `parseFromLua` now tries transform+validate per schema instead of blindly using the first schema's transform — fixes order-dependent Lua parsing in unions
+- Prototype pollution resistance in object validation — uses `Object.keys()` instead of `for...in`
+- `additionalProperties` as schema object in JSON Schema import no longer silently ignored (treated as passthrough)
+- Discriminated union import falls back to regular union when variants are not all `ZexObject`
+- `oneOf` in JSON Schema import now creates a union with `x-oneOf` metadata instead of throwing
+- `ZexError.toJSON()` added for clean JSON serialization
+- Improved error message for binary data that fails UTF-8 decoding ("Expected string, got binary data")
+
+### Changed
+- Object strict/passthrough key checks now use `Set` for O(1) lookup instead of `Array.includes()`
+- Depth limit extracted to `MAX_PARSE_DEPTH` constant
+- Documented default+nullable interaction priority in code comments
+
 ## [0.6.2] - 2025-01-10
 
 ### Fixed
-- **Export type helpers for declaration emit compatibility**
-  - Exported `InferProperty`, `InferObjectType`, and `InferTuple` from main `zex` export
-  - Fixes TS2742 errors when exporting schemas directly without `ZexSchemaPublic<T>` annotation
-  - These types were already exported from `complex-types/index.ts` but missing from main export
-  - Now TypeScript can portably reference these types when generating `.d.ts` files
-- **Export missing basic types**
-  - Added `ZexJson`, `ZexFunction`, and `ZexTValue` to main export
-  - Fixes TS2742 errors when exporting schemas that use `zex.json()`, `zex.function()`, or `zex.tvalue()`
-  - These types were already available but missing from the main export
+- Exported missing type helpers (`InferProperty`, `InferObjectType`, `InferTuple`) for declaration emit compatibility
+- Exported missing basic types (`ZexJson`, `ZexFunction`, `ZexTValue`) from main entry point
 
 ## [0.6.1] - 2025-01-10
 
 ### Fixed
-- **`ZexSchemaPublic` is now generic** - Bugfix because the KIs messed it up in 0.6.0
-  - Changed from `ZexSchemaPublic = ZexBase<any, any>` to `ZexSchemaPublic<T = any, Flags extends Record<string, boolean> = any>`
-  - Now preserves type information: `zex.infer<typeof Schema>` returns the correct type instead of `any`
-  - Correct usage pattern:
-    ```typescript
-    const FooSchemaInternal = zex.object({ name: zex.string() });
-    export type Foo = zex.infer<typeof FooSchemaInternal>;
-    export const FooSchema: ZexSchemaPublic<Foo> = FooSchemaInternal;
-    ```
+- `ZexSchemaPublic` is now generic, preserving type information instead of returning `any`
 
 ## [0.6.0] - 2025-01-10
 
 ### Added
-- **Declaration Emit Compatibility**: Support for TypeScript declaration emit (`declaration: true`) without TS2742 errors
-  - New generic `ZexSchemaPublic<T, Flags>` type alias for annotating exported schemas
-  - Available as `zex.ZexSchemaPublic<T>` and direct export `ZexSchemaPublic<T>`
-  - Preserves type information: `zex.infer<typeof Schema>` returns the correct type, not `any`
-  - Usage pattern:
-    ```typescript
-    const FooSchemaInternal = zex.object({ name: zex.string() });
-    export type Foo = zex.infer<typeof FooSchemaInternal>;
-    export const FooSchema: ZexSchemaPublic<Foo> = FooSchemaInternal;
-    ```
+- `ZexSchemaPublic<T, Flags>` type alias for annotating exported schemas without TS2742 errors
 
 ### Changed
-- **`discriminatedUnion` now accepts `ZexTypeAny`/`ZexSchemaPublic` variants**
-  - Typing now accepts `ZexBase<any, any>` (including `ZexTypeAny` and `ZexSchemaPublic`) as variants
-  - Runtime validation ensures variants are actually `ZexObject` instances using `instanceof` check
-  - Allows schemas annotated with `ZexTypeAny` or `ZexSchemaPublic` to work with `discriminatedUnion`
-  - Maintains full type safety: variants must still have literal discriminators at compile time
-  - Backward compatible: existing `ZexObject` variants continue to work as before
+- `discriminatedUnion` now accepts `ZexTypeAny`/`ZexSchemaPublic` variants (runtime validates they are `ZexObject`)
 
 ### Fixed
 - Fixed TS2345 error when using `discriminatedUnion` with schemas annotated as `ZexTypeAny`
-  - Previously, annotating schemas to avoid TS2742 would break `discriminatedUnion`
-  - Now works seamlessly with both annotated and unannotated schemas
-
-### Tests
-- Added declaration emit test suite in `tests/declaration-emit/`
-  - Tests for exported schemas with and without type annotations
-  - Verifies TS2742 compatibility and `discriminatedUnion` functionality
 
 ## [0.5.0] - 2025-10-13
 
 ### Breaking
-- safe* APIs now return structured ZexResult<T> instead of string error
-  - `{ success: true, data } | { success: false, error: ZexError }`
-  - `ZexError` is string-coercible via `toString()` and `Symbol.toPrimitive('string')`
-- Internal parsing no longer uses exceptions as control flow
-  - Unions/Discriminated Unions use result flow for variant selection
-  - Arrays/Tuples/Objects parse children/defaults via internal `_tryParse`
-  - Delta/Replace provide non-throwing `_tryParseDelta`/`_tryReplace`; safe* variants use them
-  - String `transformLua` does not throw on UTF-8 decode errors; value is preserved and validated downstream
+- `safe*` APIs now return structured `ZexResult<T>` instead of string errors
+- Internal parsing no longer uses exceptions as control flow (unions, arrays, tuples, objects use result flow)
 
-### Fixed/Improved
-- Enriched safe* error strings remain readable via string coercion
-- Cleaner stepping in debuggers (no per-variant try/catch in unions)
+### Fixed
+- Enriched `safe*` error strings remain readable via string coercion
 
 ## [0.4.2] - 2025-10-12
 
 ### Fixed
-- Enriched error strings for safeParse/safeParseFromLua to include path and type summary
-  - Format: "Error parsing structure at '{path}': Expected {Expected}, got {Got} — {details}"
-  - No API change; return type remains `{ success: false, error: string }`
+- Enriched error messages for `safeParse`/`safeParseFromLua` to include path and type summary
 
 ## [0.4.1] - 2025-10-12
 
 ### Fixed
-- Lua parseFromLua for arrays: accept 0-based contiguous numeric keys in addition to 1-based
-  - Tables with keys "0".."N-1" are now converted to JS arrays (like "1".."N" already were)
-  - Non-numeric or non-contiguous keys remain objects and will fail when an array is required
-  - Tuple behavior unchanged
+- Lua `parseFromLua` for arrays now accepts 0-based contiguous numeric keys in addition to 1-based
 
 ## [0.4.0] - 2025-10-10
 
 ### Added
-- Delta APIs on all Zex types (implemented in `ZexBase`):
-  - `parseDelta(path, value)` / `safeParseDelta(path, value)`
-    - Validates a value against the sub-schema referenced by a JSON Pointer path (supports "", "/", missing leading slash, and RFC 6901 escapes `~0`/`~1`).
-    - Tuple indices, array indices (0-based), record keys, and discriminator key validation supported.
-    - Deep traversal into unions without an instance is rejected; use `replace` instead.
-  - `replace(instance, path, value)` / `safeReplace(instance, path, value)`
-    - Replace-only semantics with full root revalidation (includes `.refine`, required checks, discriminated unions, defaults).
-    - Deletion via `undefined` only for optional object properties; arrays and root cannot be deleted.
-    - Array indices must be in-range; no append.
-
-### Tests
-- New test suites:
-  - `tests/unit/special/delta-parse.test.ts`: coverage for root, path normalization, escapes, arrays, tuples, records, unions, discriminated unions, safe variant.
-  - `tests/unit/special/delta-replace.test.ts`: coverage for root/nested replace, optional deletion, arrays/tuples/records, cross-field refine, DU updates, and failures.
-- Test runner updated to import both new suites.
-
-### Notes
-- No changes to public constructors; APIs are instance methods on schemas.
-- Strict by default is preserved; unknown keys continue to error (no implicit strip in delta flows).
+- Delta APIs: `parseDelta`/`safeParseDelta` for validating values against sub-schemas by JSON Pointer path
+- Replace APIs: `replace`/`safeReplace` for replace-only semantics with full root revalidation
 
 ## [0.3.1] - 2025-10-09
 
 ### Added
 - Custom refinement support via `refine(predicate, message?)` on all Zex types
-  - Implements `RefineValidator` executed during parse like built-in validators
-  - Runtime-only; no JSON Schema emission for custom refinements
-- Unit test: deep nested refine scenarios under `tests/unit/special/refine.test.ts`
-
-### Documentation
-- README: Added `refine` usage example and notes on runtime-only behavior
-
-### Notes
-- No breaking changes; immutable chaining preserved
 
 ## [0.3.0] - 2025-09-26
 
 ### Added
-- Policy-driven JSON Schema import pipeline
-  - New `fromJsonSchema(schema, { policy?, schemaTransforms?, typeTransforms?, deref? })`
-  - Pre-parse SchemaTransforms and post-parse TypeTransforms with composable API
-  - `zex.registerPolicy(name, { schemaTransforms, typeTransforms })`
-  - `zex.applyTypeTransforms(zexType, transforms)` helper
-- Built-in `sql` policy (PostgreSQL-focused)
-  - SchemaTransforms:
-    - `nullableFromAnyOf`: normalize `anyOf`/`oneOf`/`type:[T,'null']` → `T.nullable()`
-    - `arrayItemsFallback`: missing `items` → `items: {}` (any)
-  - TypeTransforms:
-    - `addlPropsFalse`: force `additionalProperties: false` on all objects
-    - `enumAsLiterals`: keep `zex.enum([...])` for strings-only enums, else union of literals
-    - `integer64Strategy: 'string'` (default) for `format:'int64'` or `x-pg-type:'int8'`
-    - `numericStrategy: 'string'` (default) for `format:'numeric'|'decimal'` or `x-pg-type:'numeric'`
-    - `formatMap`: timestamps → `date-time`; `uuid` → `.uuid()`; `json/jsonb` → `zex.json()`; `bytea` → `zex.buffer()`; preserve `inet/cidr/macaddr`
-- Deref hook for external `$ref` resolution: `deref(ref, { root, baseUri? })` (sync/async supported)
+- Policy-driven JSON Schema import pipeline with composable schema/type transforms
+- Built-in `sql` policy (PostgreSQL-focused) with nullable normalization, format mapping, and int64/numeric strategies
+- Deref hook for external `$ref` resolution (sync/async)
 
 ### Changed
-- Importer now recognizes `type: 'null'` directly
-- Type rebuild operations preserve flags and meta (optional, nullable, default, description, etc.)
-
-### Documentation
-- README section on Policy-Driven Import with examples and SQL preset details
-
-### Tests
-- New suite under `tests/sql/*` covering:
-  - SQL policy basic behavior
-  - additionalProperties strictness
-  - nullability normalization patterns
-  - enum handling strategy
-  - format mapping for PostgreSQL types
-  - int64/numeric strategies
-  - array items fallback
-  - deref hook
-  - no-policy regression expectations
+- Importer recognizes `type: 'null'` directly and preserves flags/meta during type rebuilds
 
 ## [0.2.10] - 2025-09-15
 
 ### Fixed
-- JSON Schema importer applies `default` for primitives (string/number/boolean) and keeps defaulted object properties non-optional on import.
-  - Ensures fields like `createdAt`/`tokenCount` with `default: 0` are populated even when missing from input after roundtrip (zex → JSON Schema → zex).
-  - Discriminated union inside array (messages[].role) continues to work as before.
-
-### Tests
-- Added behavior test for LLM conversation schema roundtrip (including `safeParseFromLua`) asserting defaults for `createdAt`/`tokenCount`.
-- Added behavior test reproducing BigInt timestamps scenario to document MessagePack decoding behavior (int64 as BigInt) and expected number validation error.
+- JSON Schema importer now applies `default` for primitives and keeps defaulted object properties non-optional on import
 
 ## [0.2.8] - 2025-09-12
 
 ### Added
-- JSON roundtrip marker for `zex.json()`
-  - Export now emits `{ format: "json" }` (non-standard marker) to preserve intent
-  - Import maps `{ format: "json" }` back to `zex.json()` with meta preserved
-  - Roundtrip stability for `zex.json()` including nested schemas
-
-### Changed
-- README cleanup: removed "What's New" sections; consolidated into primary docs
-  - Documented JSON marker behavior and roundtrip guarantees
-  - Kept README concise; full history remains in this CHANGELOG
-
-### Refactoring
-- Internal code organization: complex types and base class split into dedicated modules for maintainability
-  - `src/zex/complex-types/*` (array, object, record, literal, tuple, helpers)
-  - `src/zex/base/*` (zex-base, zex-lazy, export-context)
-  - `fromJsonSchema` moved to `src/zex/json-schema-import.ts`
-
-### Tests
-- Added roundtrip tests for `zex.json()` including nesting and meta preservation
+- JSON roundtrip marker for `zex.json()` — exports `{ format: "json" }` and re-imports correctly
 
 ## [0.2.7] - 2025-01-27
 
 ### Added
-- Targeted strip helpers on objects (runtime-only, preserve strictness for others):
-  - `object.stripOnly(...keys)` drops only these keys from input before validation
-  - `object.stripReadOnly()` drops only fields marked `readOnly: true`
-  - `object.stripWriteOnly()` drops only fields marked `writeOnly: true`
-
-### Guidance
-- Prefer `strict().stripOnly('uid')` for selectively dropping known keys while keeping typo detection
-- For writeOnly fields: make them optional (or use `partial()`) and use `stripWriteOnly()` when present
-- Avoid `omitWriteOnly().stripWriteOnly()` unless you intentionally accept removed writeOnly keys
+- Targeted strip helpers: `stripOnly(...keys)`, `stripReadOnly()`, `stripWriteOnly()` on objects
 
 ## [0.2.6] - 2025-01-27
 
 ### Added
-- Object utilities:
-  - `object.partial()` makes all top-level fields optional (shallow)
-  - `object.omit(...keys)` removes specified top-level properties; unknown handling follows object mode (strict/strip/passthrough)
-  - `object.omitReadOnly()` removes properties marked with `readOnly: true`
-  - `object.omitWriteOnly()` removes properties marked with `writeOnly: true`
+- Object utilities: `partial()`, `omit(...keys)`, `omitReadOnly()`, `omitWriteOnly()`
 
 ### Fixed
-- `safeParseFromLua` now respects object modes for unknown keys in strict/strip/passthrough consistently (no silent stripping in strict)
-
-### Notes
-- All new methods are immutable and chainable; JSON Schema export/roundtrip reflects required changes and property removals
+- `safeParseFromLua` now respects object modes for unknown keys consistently
 
 ## [0.2.5] - 2025-01-27
 
 ### Fixed
-- Enum Lua-Byte-Strings werden jetzt korrekt zu UTF-8 Strings decodiert
-  - `ZexEnum.transformLua` dekodiert `Uint8Array`/Buffer/ArrayBuffer und byte-ähnliche Objekte
-  - Behebt `safeParseFromLua`-Fehler bei Enums in zusammengesetzten Strukturen (z. B. Display-Status)
+- Enum Lua byte-strings are now correctly decoded to UTF-8 strings in `safeParseFromLua`
 
 ## [0.2.4] - 2025-01-27
 
 ### Added
-- JSON Schema $defs/$ref Export (Phase 2)
-  - Export-Registry erstellt stabile Einträge in `$defs` und verweist per `$ref`
-  - Unterstützt rekursive/lazy Strukturen ohne Inline-Duplikate
+- JSON Schema `$defs`/`$ref` export with stable registry entries and support for recursive/lazy structures
 
 ### Fixed
-- JSON Schema $ref Import-Resolver
-  - `fromJsonSchema` löst lokale `$defs`-Referenzen auf, mit Memoisierung und Lazy-Platzhaltern für Zyklen
-  - Discriminated Unions in geschachtelten Positionen bleiben erhalten
-
-### Tests
-- Neuer Lazy-Display Roundtrip-Test prüft $defs/$ref Nutzung und erfolgreiche Re-Import-Validierung
+- JSON Schema `$ref` import resolver with memoization and lazy placeholders for cycles
 
 ## [0.2.3] - 2025-01-27
 
 ### Changed
-- Optional object properties are now omitted when missing (no `key: undefined`)
-  - Applies to both `parse` and `parseFromLua`
-  - Avoids cross-runtime coercion of `undefined` into placeholder objects
-  - Aligns with JSON behavior (`JSON.stringify` drops undefined properties)
+- Optional object properties are now omitted when missing (no `key: undefined` in output)
 
 ## [0.2.2] - 2025-01-27
 
 ### Fixed
-- Importer now correctly reconstructs discriminated unions nested inside arrays
-  - When importing `type: "array"` with `items.anyOf` and `items.discriminator.propertyName`,
-    `fromJsonSchema` builds a `discriminatedUnion` for the item schema instead of a plain union
-  - Fixes roundtrip where nested DU fields were dropped during Lua pre-transform
-  - Ensures `messages[].role` DUs survive roundtrip and `safeParseFromLua` preserves variant fields
-
-### Notes
-- Export already emitted standards-conform JSON Schema (Draft 2020-12): `anyOf` + `discriminator`
-- This release aligns importer behavior with exporter for nested DU scenarios
+- Importer correctly reconstructs discriminated unions nested inside arrays
 
 ## [0.2.1] - 2025-01-27
 
-### New Features
-- **JSON-Serializable Type**: Added `zex.json()` for clear intent signaling
-  - Accepts any JSON-serializable data (objects, arrays, primitives)
-  - Rejects functions and binary data (Uint8Array, Buffer) recursively
-  - Provides semantic clarity over `zex.any()` for JSON-compatible fields
-  - Same flexibility as `zex.any()` but with better documentation intent
-  - Includes comprehensive test coverage and documentation
+### Added
+- `zex.json()` type for JSON-serializable data (rejects functions and binary data)
 
-## [0.2.0] - 2025-09-06 
+## [0.2.0] - 2025-09-06
 
 ### Breaking Changes
-- **Composition Keywords Rejection**: `allOf`, `oneOf`, and `not` now throw clear errors instead of being silently ignored
-  - `allOf` → Use `zex.object().extend()` for object composition
-  - `oneOf`/`not` → Use `zex.union()` with specific types
-  - This is a breaking change for code importing schemas with these keywords
+- `allOf`, `oneOf`, and `not` in JSON Schema import now throw clear errors instead of being silently ignored
 
-### New Features
-- **Explicit Record Marking**: 
-  - Records now export `format: "record"` in JSON Schema
-  - Import only creates `ZexRecord` when `format: "record"` is present
-  - Eliminates ambiguous guessing between records and regular objects
-- **Jsonschema Type Preservation**:
-  - `zex.jsonschema()` now exports `format: "jsonschema"`
-  - Roundtrip preserves type information correctly
-  - No more `ZexJsonSchema` → `ZexObject` conversion
-- **Better Error Messages**:
-  - Clear guidance for unsupported JSON Schema features
-  - Helpful suggestions for alternatives
+### Added
+- Explicit record marking via `format: "record"` in JSON Schema export/import
+- `zex.jsonschema()` now roundtrips correctly via `format: "jsonschema"`
 
-### Improvements
-- **Lua Byte-String Decoding**:
-  - Fixed parsing of `Uint8Array`/Buffer/byte objects in unions and discriminated unions
-  - `ZexLiteral.transformLua` now decodes byte representations to UTF-8 strings
-  - `ZexDiscriminatedUnion.transformLua` normalizes discriminator values
-  - Simplified byte decoding to Uint8Array-only (removed complex heuristics)
-- **JSON Schema Standards Compliance**:
-  - Discriminated unions now use JSON Schema Draft 2020-12 discriminator format
-  - Exports `{ anyOf: [...], discriminator: { propertyName: "key" } }`
-  - Import only creates `ZexDiscriminatedUnion` with explicit discriminator
-
-### Performance Optimizations
-- Meta-only schemas now use early exit pattern
-- Eliminated complex fallback logic at end of `fromJsonSchemaInternal`
-- Created `isMetaOnlySchema()` helper for clear intent
-
-### Code Organization
-- Extracted union classes to `src/zex/unions.ts` and `src/zex/literal.ts`
-- Created `src/zex/utils/lua.ts` for shared byte decoding
-- Reduced file sizes to ~250 LOC guideline
-
-### Refactoring
-- **Simplified Discriminated Union Logic**: Removed heuristic discriminator detection
-- **Explicit Type Markers**: Replaced guessing with clear format-based identification
-- **Cleaner Error Handling**: Centralized composition keyword rejection
-- **Better Separation of Concerns**: Type markers vs validators vs metadata
-
-### Technical Details
-- **Files Modified**: `src/zex/index.ts`, `src/zex/unions.ts`, `src/zex/literal.ts`, `src/zex/special-types.ts`, `src/zex/complex-types.ts`
-- **New Files**: `src/zex/utils/lua.ts`
-- **Tests Added**: `tests/behavior/lua-union-literal-discriminant-bytes.test.ts`
-- **Breaking Changes**: 1 (composition keywords)
-- **New Features**: 3 (format markers, better errors)
-- **Improvements**: 4 (Lua decoding, standards, performance, organization)
+### Fixed
+- Lua byte-string decoding in unions, discriminated unions, and literals
+- Discriminated unions now use JSON Schema Draft 2020-12 discriminator format

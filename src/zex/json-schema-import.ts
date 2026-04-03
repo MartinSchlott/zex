@@ -411,7 +411,13 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     throw new Error(`fromJsonSchema: "allOf" is not supported at path '${errorPath}'. Use zex.object().extend() for object composition instead.`);
   }
   if (schema.oneOf) {
-    throw new Error(`fromJsonSchema: "oneOf" is not supported at path '${errorPath}'. Use zex.union() instead.`);
+    // Import oneOf as union (anyOf semantics). The mutual exclusivity
+    // constraint of oneOf cannot be modelled in Zex, but we preserve it
+    // as metadata so it can be restored on re-export if needed.
+    const variants = (schema.oneOf as any[]).map((s: any, i: number) =>
+      fromJsonSchemaInternal(s, [...path, `oneOf[${i}]`], root, ctx)
+    );
+    return zex.union(...variants).meta({ ...meta, 'x-oneOf': true }) as ZexBase<any>;
   }
   if (schema.not) {
     throw new Error(`fromJsonSchema: "not" is not supported at path '${errorPath}'. Use zex.union() with specific types instead.`);
@@ -591,6 +597,12 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     } else if (schema.additionalProperties === false) {
       allowAdditionalProps = false;
       mode = "strict";
+    } else if (schema.additionalProperties !== undefined && typeof schema.additionalProperties === 'object') {
+      // additionalProperties is a schema object (e.g. { type: "string" })
+      // Treat as passthrough — the value schema constrains extra keys but
+      // Zex doesn't model per-key-value schemas on objects, so we allow them through.
+      allowAdditionalProps = true;
+      mode = "passthrough";
     } else if (schema.additionalProperties === undefined) {
       // If no additionalProperties is specified and no properties are defined,
       // default to allowing additional properties (common in OpenAPI)
@@ -601,7 +613,7 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     }
     // Create object schema with appropriate additionalProperties setting and mode
     const objectSchema = zex.object(shape, allowAdditionalProps, mode).meta(meta) as ZexBase<any>;
-    
+
     return objectSchema;
   }
   
@@ -616,7 +628,13 @@ function fromJsonSchemaInternal(schema: any, path: (string | number)[] = [], roo
     if (discriminator && typeof discriminator === 'object' && typeof discriminator.propertyName === 'string') {
       const key = discriminator.propertyName as string;
       const reconstructedVariants = (schema.anyOf as any[]).map((v, i) => fromJsonSchemaInternal(v, [...path, `anyOf[${i}]`], root, ctx)) as any[];
-      return (zex as any).discriminatedUnion(key, ...reconstructedVariants).meta(meta) as ZexBase<any>;
+      // Only build a discriminatedUnion if ALL variants are ZexObject instances;
+      // otherwise fall through to a regular union to avoid runtime errors.
+      const allObjects = reconstructedVariants.every(v => v instanceof ZexObject);
+      if (allObjects) {
+        return (zex as any).discriminatedUnion(key, ...reconstructedVariants).meta(meta) as ZexBase<any>;
+      }
+      // Fall through to regular union below
     }
     
     // Fallback: regular union (no discriminator detection)

@@ -144,6 +144,10 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
       return { success: false, error: `Expected object, got ${dataType}` };
     }
 
+    // Note: Symbol-keyed properties are intentionally ignored.
+    // Zex validates string-keyed properties only, matching JSON semantics.
+    // Symbols are not representable in JSON Schema and pass through untouched.
+
     // Validate each field
     for (const [key, schema] of Object.entries(this.shape)) {
       if (key in data) {
@@ -216,9 +220,9 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
 
     // --- STRICT MODE: Check for unknown properties (only if not allowing additional properties) ---
     if (this.mode === "strict") {
-      const shapeKeys = Object.keys(this.shape);
-      for (const key in validatedData) {
-        if (!shapeKeys.includes(key)) {
+      const shapeKeySet = new Set(Object.keys(this.shape));
+      for (const key of Object.keys(validatedData)) {
+        if (!shapeKeySet.has(key)) {
           // Throw structured error for unknown properties
           throw new ZexError(
             path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
@@ -305,9 +309,9 @@ export class ZexObject<T extends Record<string, ZexBase<any, any>>> extends ZexB
 
     // If passthrough, include additional properties
     if (this.mode === "passthrough") {
-      const shapeKeys = Object.keys(this.shape);
-      for (const key in validatedData) {
-        if (!shapeKeys.includes(key)) {
+      const shapeKeySet = new Set(Object.keys(this.shape));
+      for (const key of Object.keys(validatedData)) {
+        if (!shapeKeySet.has(key)) {
           result[key] = (validatedData as any)[key];
         }
       }

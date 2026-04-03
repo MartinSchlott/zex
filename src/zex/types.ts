@@ -64,6 +64,9 @@ export type ParseContext = {
   rootDescription?: string;
 };
 
+/** Maximum nesting depth for schema parsing. Prevents infinite recursion on deeply nested data. */
+export const MAX_PARSE_DEPTH = 100;
+
 // Strukturierte Fehlerklasse für besseres Debugging und UI-Integration
 export class ZexError extends Error {
   constructor(
@@ -81,6 +84,18 @@ export class ZexError extends Error {
   toString(): string {
     const pathStr = this.path.length > 0 ? this.path.join('.') : 'root';
     return `ZexError at ${pathStr}: ${this.message}`;
+  }
+
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      path: this.path,
+      code: this.code,
+      message: this.message,
+      received: this.received,
+      expected: this.expected,
+      innerErrors: this.innerErrors?.map(e => e.toJSON())
+    };
   }
 
   [Symbol.toPrimitive](hint: string) {

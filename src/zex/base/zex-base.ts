@@ -1,7 +1,7 @@
 // zex-base.ts - Base class for all Zex types with Flag-Tracking
 // =============================================================================
 
-import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseContext, ZexError, ZexResult } from '../types.js';
+import { JsonSchema, ValidationResult, ZexConfig, Validator, PathEntry, ParseContext, ZexError, ZexResult, MAX_PARSE_DEPTH } from '../types.js';
 import { RefineValidator } from '../validators.js';
 import { beginExportCtx, endExportCtx, getCurrentExportCtx } from './export-context.js';
 
@@ -622,25 +622,34 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
     }
 
     // Check depth limit
-    if (path.length > 100) {
+    if (path.length > MAX_PARSE_DEPTH) {
       throw new ZexError(
         path.map(p => p.key || String(p.index || 'root')),
         'max_depth',
-        `Maximum depth exceeded`,
+        `Maximum nesting depth of ${MAX_PARSE_DEPTH} exceeded`,
         undefined,
-        'depth limit: 100'
+        `depth limit: ${MAX_PARSE_DEPTH}`
       );
     }
 
-    // --- INTELLIGENTES DEFAULT-VERHALTEN ---
-    // Default greift bei 'undefined' ODER bei 'null', wenn das Schema NICHT nullable ist.
-    if ((data === undefined || (data === null && !this.config.nullable)) 
+    // --- DEFAULT + NULLABLE INTERACTION ---
+    // Priority order:
+    //   1. undefined → apply default (if set)
+    //   2. null + NOT nullable → apply default (if set), treats null as "missing"
+    //   3. null + nullable → return null (nullable takes precedence over default)
+    //   4. undefined + optional (no default) → return undefined
+    //
+    // Examples:
+    //   string().default("x").parse(undefined)            → "x"
+    //   string().default("x").parse(null)                 → "x"  (null treated as missing)
+    //   string().default("x").nullable().parse(null)      → null (nullable wins)
+    //   string().default("x").nullable().parse(undefined) → "x"
+    if ((data === undefined || (data === null && !this.config.nullable))
         && this.config.defaultValue !== undefined) {
       return this.config.defaultValue as T;
     }
-    // --- ENDE ---
 
-    // Handle optional/nullable NACH der Default-Prüfung
+    // Handle optional/nullable AFTER default check
     if (data === undefined && this.config.optional) {
       return undefined as T;
     }
@@ -715,10 +724,9 @@ export abstract class ZexBase<T, TFlags extends Record<string, boolean> = {}> {
 
   // Path tracking utilities
   private hasCircularReference(path: PathEntry[]): boolean {
-    // Only check for circular references if we have a path (not at root level)
-    if (path.length === 0) return false;
-    
     // Check if this schema appears more than once in the path
+    // (once is expected — it means we're currently parsing it;
+    //  twice means we've recursed back into the same schema)
     const occurrences = path.filter(entry => entry.schema === this).length;
     return occurrences > 1;
   }

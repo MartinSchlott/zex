@@ -63,7 +63,12 @@ export class ZexString<TFlags extends Record<string, boolean> = {}> extends ZexB
 
   protected validateType(data: unknown): { success: true } | { success: false; error: string } {
     if (typeof data !== 'string') {
-      return { success: false, error: 'Expected string' };
+      // Provide a more helpful error when binary data couldn't be decoded to string
+      if (data instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(data))
+          || (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer)) {
+        return { success: false, error: 'Expected string, got binary data (UTF-8 decoding may have failed)' };
+      }
+      return { success: false, error: `Expected string, got ${typeof data}` };
     }
     return { success: true };
   }

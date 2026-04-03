@@ -1,7 +1,7 @@
 // zex-lazy.ts - Lazy loading implementation for Zex
 // =============================================================================
 
-import { JsonSchema, PathEntry, ZexConfig } from '../types.js';
+import { JsonSchema, PathEntry, ZexConfig, ZexError } from '../types.js';
 import { ZexBase } from './zex-base.js';
 import { getCurrentExportCtx } from './export-context.js';
 
@@ -48,7 +48,25 @@ export class ZexLazy<T> extends ZexBase<T> {
     return (this.inner() as any).validateType(data);
   }
 
+  private _parsing = false;
+
   protected _parse(data: unknown, path: PathEntry[]): T {
-    return (this.inner() as any)._parse(data, path);
+    // Guard against direct self-reference: if this lazy schema is already
+    // resolving, we have a cycle (e.g. lazy(() => self))
+    if (this._parsing) {
+      throw new ZexError(
+        path.map(p => (p.key ?? (p.index !== undefined ? String(p.index) : 'root'))),
+        'circular_reference',
+        'Circular reference detected in lazy schema',
+        undefined,
+        'no circular references allowed'
+      );
+    }
+    this._parsing = true;
+    try {
+      return (this.inner() as any)._parse(data, path);
+    } finally {
+      this._parsing = false;
+    }
   }
 }

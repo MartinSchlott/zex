@@ -1,578 +1,186 @@
-# Zex - The Other Zod
+# Zex
 
-*Zex - The Other Zod: it is like the guy who actually build the house, not dream of the perfect one.*
+*The guy who actually builds the house, not dreams of the perfect one.*
 
-## Why Zex Exists
+Zex is a TypeScript schema validation library built for real-world scenarios that mainstream validators don't cover: Lua data structures, binary buffers, JSON Pointer delta updates, and policy-driven schema import from PostgreSQL and OpenAPI sources. Strict by default, zero dependencies, bidirectional JSON Schema.
 
-After losing two days fighting with Zod 4 migration issues, I decided to build my own validation library. Here's what drove me crazy about Zod:
+## Install
 
-### The Problems with Zod
-
-- **Zod is made by purists**: It's a great library, but it's not for everyone. It's not for me, I am more practical.
-- **Zod 4 breaking changes**: The interface changed, making migration not really easy
-- **Missing essential types**: No binary/buffer type support out of the box. But yeah, because we need to use JSON.stringify() and JSON.parse()
-- **Lua support**: Working with Lua data required workarounds (I know will not hit many)
-- **JSON Schema mess**: Need additional libraries for basic JSON Schema conversion - seriously?
-- **Not strict by default**: Objects allow unknown properties by default, making typos invisible until production. Sorry, happens to me more often than I'd like.
-- **Security implications**: Non-strict validation can lead to unexpected data passing through. Because I forget to add strict mode to every object, what a boilerplate.
-- **Terrible error messages**: Complex, nested, hard-to-understand error reporting. Without AI I wouldn't have understand a single word.
-- **Poor extensibility**: Zod 4 is practically impossible to extend cleanly. Zex is a little bit better.
-- **Wrapper hell**: Everything wrapped in classes with confusing APIs. Yeah, it's my opinion.
-
-### The Zex Solution
-
-Built using Claude, ChatGPT, Gemini, and Cursor, Zex addresses these pain points:
-
-- ✅ **Strict by default**: Objects reject unknown properties unless explicitly allowed. 
-- ✅ **Binary data support**: First-class `buffer()` type with MIME type support
-- ✅ **Lua transformation**: Built-in support for Lua data structures
-- ✅ **JSON Schema**: Native bidirectional JSON Schema conversion
-- ✅ **Clear error messages**: Structured errors with path tracking
-- ✅ **Immutable API**: No wrapper classes, clean fluent interface
-- ✅ **TypeScript-first**: Excellent type inference and IDE support
-- ✅ **Extensible**: Easy to add custom validators and types
-- ✅ **Discriminated Unions**: First-class `discriminatedUnion()` with clean types and JSON Schema export
-- ✅ **Object Utilities**: `object.partial()`, `object.omit(...)`, `omitReadOnly()`, `omitWriteOnly()` for ergonomic object shaping
-- ✅ **UI Hints**: String `.multiline()` → JSON Schema `x-ui-multiline`
-- ✅ **Read/Write Annotations**: `.readOnly()` / `.writeOnly()` on all types (documentation-only)
- - ✅ **Delta & Replace APIs (0.4.0)**: Validate and apply sub-tree updates efficiently
-
-*See [CHANGELOG.md](./CHANGELOG.md) for full details.*
+```bash
+npm install @ai-inquisitor/zex
+```
 
 ## Quick Start
 
 ```typescript
 import { zex } from '@ai-inquisitor/zex';
 
-// Basic types
 const userSchema = zex.object({
   name: zex.string().min(2),
-  age: zex.number().int().min(0),
   email: zex.string().email(),
+  role: zex.enum(['admin', 'user', 'guest']),
   avatar: zex.buffer('image/jpeg').optional()
 });
 
 type User = zex.infer<typeof userSchema>;
 
-// Parse data
-const result = userSchema.parse({
-  name: "John Doe",
-  age: 30,
-  email: "john@example.com"
-});
+// Strict by default — unknown properties throw
+userSchema.parse({ name: "Alice", email: "a@b.com", role: "admin" }); // ok
+userSchema.parse({ name: "Alice", email: "a@b.com", role: "admin", typo: 1 }); // throws
+
+// JSON Schema roundtrip
+const jsonSchema = userSchema.toJSONSchema();
+const recreated = zex.fromJsonSchema(jsonSchema);
 ```
 
-## Key Features
+## What Makes Zex Different
 
-### Strict by Default
+These are the features you won't find in Zod or similar libraries:
+
+### Binary Buffer Type
+
+First-class `buffer()` with MIME support. Accepts `Uint8Array`, `ArrayBuffer`, and Node.js `Buffer`. Roundtrips through JSON Schema via `format: "buffer"`.
+
 ```typescript
-const schema = zex.object({
-  name: zex.string()
-});
-
-// This throws an error - unknown property 'typo'
-schema.parse({ name: "John", typo: "oops" }); // ❌ ZexError
-
-// Explicitly allow additional properties
-const flexible = schema.passthrough();
-flexible.parse({ name: "John", extra: "allowed" }); // ✅
-```
-
-### Binary Data Support
-```typescript
-const imageSchema = zex.buffer('image/png');
-const fileSchema = zex.object({
-  filename: zex.string(),
-  content: zex.buffer('application/pdf'),
-  thumbnail: zex.buffer('image/jpeg').optional()
+const upload = zex.object({
+  file: zex.buffer('application/pdf'),
+  thumbnail: zex.buffer('image/png').optional()
 });
 ```
-
-### JSON-Serializable Data
-```typescript
-const configSchema = zex.object({
-  // Clear intent: this should be JSON-serializable
-  userData: zex.json().describe("User data that will be stored as JSON"),
-  settings: zex.json().optional(),
-  
-  // vs unclear intent:
-  // userData: zex.any(),
-});
-
-// Accepts objects, arrays, primitives
-configSchema.parse({
-  userData: { name: "John", preferences: { theme: "dark" } },
-  settings: { notifications: true }
-});
-
-// Rejects functions and binary data
-// configSchema.parse({ userData: () => {} }); // ❌ Error
-// configSchema.parse({ userData: new Uint8Array([1,2,3]) }); // ❌ Error
-```
-
-- JSON Schema export uses a non-standard marker to preserve intent: `zex.json()` → `{ format: "json" }`.
-- Import preserves the type: `{ format: "json" }` → `zex.json()` (roundtrip-stable).
 
 ### Lua Data Transformation
+
+`parseFromLua()` converts Lua table structures (1-based arrays, byte objects) to JavaScript types. Built for projects bridging Lua and TypeScript.
+
 ```typescript
-// Lua arrays are 1-indexed objects
-const luaArray = { "1": "first", "2": "second", "3": "third" };
 const schema = zex.array(zex.string());
-
-const result = schema.parseFromLua(luaArray);
-// Result: ["first", "second", "third"]
+schema.parseFromLua({ "1": "first", "2": "second" }); // ["first", "second"]
 ```
 
-### JSON Schema Integration
-```typescript
-const schema = zex.object({
-  name: zex.string().describe("User's full name"),
-  age: zex.number().int().min(0).max(120)
-});
+### Delta & Replace APIs
 
-// Generate JSON Schema (optional $schema)
-const jsonSchema = schema.toJSONSchema({
-  $schema: "https://json-schema.org/draft/2020-12/schema"
-});
-
-// Parse from JSON Schema
-const recreated = zex.fromJsonSchema(jsonSchema);
-
-// Explicit type markers for perfect roundtrips
-const recordSchema = zex.record(zex.string());
-const jsonSchema = recordSchema.toJSONSchema();
-// Exports: { "type": "object", "format": "record", "additionalProperties": { "type": "string" } }
-
-const jsonschemaType = zex.jsonschema();
-const jsonschemaJson = jsonschemaType.toJSONSchema();
-// Exports: { "type": "object", "format": "jsonschema", "description": "JSON Schema object" }
-
-const jsonData = zex.json();
-const jsonDataJson = jsonData.toJSONSchema();
-// Exports: { "format": "json" }
-```
-
-- Import mapping for number bounds:
-  - `exclusiveMinimum === 0` → `.positive()`
-  - `minimum === 0` → `.nonnegative()`
-  - `exclusiveMaximum === 0` → `.negative()`
-  - `maximum === 0` → `.nonpositive()`
-- Export includes all constraints without deduplication; when multiple bounds exist, the tighter bound prevails at runtime.
-
-### Policy-Driven Import (New in 0.3.0)
-
-Zex can now normalize imported JSON Schemas via pre-parse SchemaTransforms and post-parse TypeTransforms.
-
-- `zex.fromJsonSchema(schema, { policy?, schemaTransforms?, typeTransforms?, deref? })`
-- `zex.registerPolicy(name, { schemaTransforms, typeTransforms })`
-- `zex.applyTypeTransforms(zexType, transforms)`
-
-Phases:
-- SchemaTransforms (pre-parse): operate on the JSON Schema before import (e.g., nullability normalization, array items fallback, custom `$ref` resolution).
-- TypeTransforms (post-parse): operate on the returned Zex type graph (e.g., strict objects, enum handling, format mapping).
-
-#### Built-in: SQL Policy
-Enable with `policy: 'sql'` to make SQL/OpenAPI-origin schemas ergonomic without app-side post-processing.
-
-- SchemaTransforms:
-  - `nullableFromAnyOf`: normalizes `anyOf`/`oneOf`/`type:[T,'null']` into `T.nullable()`
-  - `arrayItemsFallback`: missing `items` → `items: {}` (i.e., `any`)
-- TypeTransforms:
-  - `addlPropsFalse`: all objects become strict (`additionalProperties: false`)
-  - `enumAsLiterals`: keep `zex.enum([...])` when all values are strings; otherwise `zex.union(zex.literal(...))`
-  - `integer64Strategy: 'string'` by default; map `int64`/`x-pg-type:int8` to string
-  - `numericStrategy: 'string'` by default; map `numeric/decimal` to string
-  - `formatMap`:
-    - `timestamp without time zone` | `timestamp with time zone` | `timestamptz` → `.format('date-time')`
-    - `uuid` → `zex.string().uuid()`
-    - `json`/`jsonb` (via `x-pg-type`) → `zex.json()`
-    - `bytea` → `zex.buffer()`
-    - `inet`/`cidr`/`macaddr` formats preserved
-
-Example:
-```typescript
-const imported = zex.fromJsonSchema(somePgJsonSchema, { policy: 'sql' });
-// All objects strict, nullability normalized, int64/numeric mapped per strategy,
-// bytea → buffer, jsonb → zex.json(), timestamps → date-time.
-```
-
-Customization:
-```typescript
-zex.registerPolicy('my-sql', {
-  schemaTransforms: [/* custom pre-parse transforms */],
-  typeTransforms: [/* custom post-parse transforms */]
-});
-
-const t = zex.fromJsonSchema(schema, {
-  policy: 'my-sql',
-  deref: async (ref, ctx) => {/* resolve external refs */}
-});
-```
-
-#### UI Hints and Annotations
-- String UI hint `.multiline(n?)` exports to `x-ui-multiline` in JSON Schema; omitted when 0. `getMultiline()` returns the number (default 0).
-- Access annotations `.readOnly()` / `.writeOnly()` export JSON Schema `readOnly: true` / `writeOnly: true`. Passing `false` removes the key. Imported `false` values are normalized (dropped). These flags are documentation-only and do not affect parsing/validation.
-
-### Format Features and Metadata
-
-Zex provides comprehensive format support for JSON Schema generation and validation:
-
-#### Manual Format Setting
-```typescript
-// Set custom format for JSON Schema
-const schema = zex.string()
-  .format('date-time')
-  .describe('ISO 8601 timestamp');
-
-// Set MIME type for content
-const textSchema = zex.string()
-  .mimeFormat('text/plain')
-  .describe('Plain text content');
-
-// Combine format and MIME type
-const jsonSchema = zex.string()
-  .format('json')
-  .mimeFormat('application/json')
-  .describe('JSON string');
-```
-
-#### Automatic Format Detection
-Built-in validators automatically set appropriate formats:
+Validate and apply sub-tree updates by JSON Pointer path without re-sending the entire object. Full root revalidation including `.refine()` constraints.
 
 ```typescript
-// Email validator sets format: 'email'
-const emailSchema = zex.string().email();
-const emailJson = emailSchema.toJSONSchema();
-// Result: { "type": "string", "format": "email" }
-
-// UUID validator sets format: 'uuid'
-const uuidSchema = zex.string().uuid();
-const uuidJson = uuidSchema.toJSONSchema();
-// Result: { "type": "string", "format": "uuid" }
-
-// URI/URL types have built-in formats
-const uriSchema = zex.uri();
-const uriJson = uriSchema.toJSONSchema();
-// Result: { "type": "string", "format": "uri" }
-
-const urlSchema = zex.url();
-const urlJson = urlSchema.toJSONSchema();
-// Result: { "type": "string", "format": "uri-reference" }
+const user = userSchema.parse(data);
+const updated = userSchema.replace(user, '/profile/name', 'Bob');
+userSchema.parseDelta('/profile/name', 'Alice'); // validate without instance
 ```
 
-### Custom Refinements (neu)
-```typescript
-// Refine fügt eine benutzerdefinierte Validierung hinzu (zur Laufzeit; kein JSON Schema Output)
-const User = zex.object({
-  profile: zex.object({
-    contacts: zex.array(zex.union(
-      zex.object({ kind: zex.literal('email'), value: zex.string().email() }),
-      zex.object({ kind: zex.literal('phone'), value: zex.string().pattern('^\\\+?[0-9]{7,15}$') })
-    ))
-  }),
-  settings: zex.object({ theme: zex.enum(['light', 'dark']), flags: zex.record(zex.boolean()) })
-})
-// mindestens ein E-Mail-Kontakt erforderlich
-.refine(u => Array.isArray((u as any).profile?.contacts) && (u as any).profile.contacts.some((c: any) => c?.kind === 'email'), 'At least one email contact required')
-// dark Theme erfordert flags.darkMode === true
-.refine(u => (u as any).settings?.theme !== 'dark' || (u as any).settings?.flags?.darkMode === true, 'flags.darkMode must be true for dark theme');
+### Policy-Driven JSON Schema Import
 
-User.parse({
-  profile: { contacts: [ { kind: 'email', value: 'a@b.de' } ] },
-  settings: { theme: 'dark', flags: { darkMode: true } }
-}); // ✅
-```
-
-#### Buffer Format Support
-Binary data uses a custom format for clear semantics:
+Composable transform pipeline for importing schemas from PostgreSQL, OpenAPI, or custom sources. Pre-parse schema transforms and post-parse type transforms.
 
 ```typescript
-// Buffer with MIME type
-const imageSchema = zex.buffer('image/png');
-const imageJson = imageSchema.toJSONSchema();
-// Result: { 
-//   "type": "object", 
-//   "format": "buffer",
-//   "contentMediaType": "image/png" 
-// }
-
-// Buffer without MIME type
-const genericBuffer = zex.buffer();
-const bufferJson = genericBuffer.toJSONSchema();
-// Result: { "type": "object", "format": "buffer" }
+const schema = zex.fromJsonSchema(postgresJsonSchema, { policy: 'sql' });
+// int64 -> string, jsonb -> zex.json(), bytea -> zex.buffer(),
+// timestamps -> date-time, all objects strict, nullability normalized
 ```
 
-### Delta & Replace APIs (new in 0.4.0)
-```typescript
-const User = zex.object({
-  profile: zex.object({
-    name: zex.string().min(2),
-    nickname: zex.string().optional(),
-    contacts: zex.array(zex.union(
-      zex.object({ kind: zex.literal('email'), value: zex.string().email() }),
-      zex.object({ kind: zex.literal('phone'), value: zex.string().pattern('^\\+?[0-9]{7,15}$') })
-    ))
-  }),
-  coords: zex.tuple([zex.number(), zex.number()]),
-  settings: zex.object({ theme: zex.enum(['light','dark']), flags: zex.record(zex.boolean()) }),
-  pets: zex.array(zex.discriminatedUnion('type',
-    zex.object({ type: zex.literal('dog'), barks: zex.boolean() }),
-    zex.object({ type: zex.literal('cat'), meows: zex.boolean() })
-  ))
-});
+## API Reference
 
-// Validate a value at a sub-path (JSON Pointer; supports "", "/", no leading slash)
-(User as any).parseDelta('/profile/name', 'Alice');
-(User as any).safeParseDelta('coords/1', 5);
+### Types
 
-// Replace-only update with full root validation
-const next = (User as any).replace(current, '/profile/name', 'Bob');
-// Optional deletion for object properties via undefined
-const next2 = (User as any).replace(next, '/profile/nickname', undefined);
-// Arrays/tuples by index; in-range only, no deletion via undefined
-const next3 = (User as any).replace(next2, '/coords/0', 1);
-// Discriminated unions: replace whole element when changing discriminator
-const next4 = (User as any).replace(next3, '/pets/0', { type: 'cat', meows: true });
-```
+| Type | Description |
+|------|-------------|
+| `zex.string()` | `.email()` `.uuid()` `.min()` `.max()` `.pattern()` `.multiline()` |
+| `zex.number()` | Finite-only. `.int()` `.min()` `.max()` `.positive()` `.nonnegative()` `.negative()` `.nonpositive()` |
+| `zex.boolean()` | Boolean values |
+| `zex.object(shape)` | Strict by default. `.passthrough()` `.strip()` `.partial()` `.omit()` `.extend()` |
+| `zex.array(schema)` | `.min()` `.max()` |
+| `zex.record(schema)` | String-keyed dictionaries |
+| `zex.tuple([...])` | Fixed-length typed arrays |
+| `zex.union(a, b, ...)` | Variadic union (not wrapped in array) |
+| `zex.discriminatedUnion(key, a, b, ...)` | Tagged union with efficient dispatch |
+| `zex.literal(value)` | Exact value match |
+| `zex.enum([...])` | String/number enumeration |
+| `zex.buffer(mime?)` | Binary data with optional MIME type |
+| `zex.json()` | JSON-serializable data (rejects functions and binary) |
+| `zex.uri()` / `zex.url()` | URI and HTTP URL validation |
+| `zex.lazy(() => schema)` | Recursive schemas |
+| `zex.any()` | Any value (use sparingly) |
+| `zex.null()` | Null only |
 
-Guidelines:
-- Replace-only, no merge/append/move.
-- `undefined` deletes only optional object properties; arrays/root cannot be deleted.
-- JSON Pointer escapes supported: `~1` → `/`, `~0` → `~`.
-- Deep traversal inside unions via `parseDelta` is not allowed; use `replace` with the current instance.
+### Modifiers (all types)
 
-#### Record Format
-Record types use a special format marker for perfect roundtrips:
+| Modifier | Effect |
+|----------|--------|
+| `.optional()` | Allow `undefined` |
+| `.nullable()` | Allow `null` |
+| `.default(value)` | Apply default when missing |
+| `.describe(text)` | JSON Schema `description` |
+| `.title(text)` | JSON Schema `title` |
+| `.format(fmt)` | JSON Schema `format` |
+| `.mimeFormat(mime)` | JSON Schema `contentMediaType` |
+| `.deprecated()` | JSON Schema `deprecated` |
+| `.readOnly()` / `.writeOnly()` | JSON Schema annotations (documentation-only) |
+| `.meta(obj)` | Arbitrary JSON Schema metadata |
+| `.refine(fn, msg?)` | Custom validation (runtime-only) |
+| `.example(value)` | JSON Schema `examples` |
+
+### Object Utilities
 
 ```typescript
-const recordSchema = zex.record(zex.string());
-const recordJson = recordSchema.toJSONSchema();
-// Result: {
-//   "type": "object",
-//   "format": "record",
-//   "additionalProperties": { "type": "string" }
-// }
+const base = zex.object({ a: zex.string(), b: zex.number(), r: zex.string().readOnly() });
+
+base.partial();          // all fields optional (shallow)
+base.omit('b');          // remove keys from schema
+base.omitReadOnly();     // remove readOnly fields from schema
+base.omitWriteOnly();    // remove writeOnly fields from schema
+base.stripOnly('uid');   // runtime: drop specific keys, keep strict for the rest
+base.stripReadOnly();    // runtime: drop readOnly fields from input
+base.stripWriteOnly();   // runtime: drop writeOnly fields from input
 ```
 
-#### JSON Schema Format Import
-Zex can import and recognize various formats from JSON Schema:
+### Parsing
+
+| Method | Behavior |
+|--------|----------|
+| `.parse(data)` | Returns validated data or throws `ZexError` |
+| `.safeParse(data)` | Returns `{ success, data }` or `{ success, error }` |
+| `.parseFromLua(data)` | Lua transform + parse |
+| `.safeParseFromLua(data)` | Lua transform + safe parse |
+| `.parseDelta(path, value)` | Validate value at JSON Pointer path |
+| `.replace(instance, path, value)` | Replace at path with full revalidation |
+
+### JSON Schema
 
 ```typescript
-// Import from JSON Schema with format
-const importedSchema = zex.fromJsonSchema({
-  "type": "string",
-  "format": "email"
-});
-// Creates: zex.string().email()
-
-// Import buffer format
-const bufferSchema = zex.fromJsonSchema({
-  "type": "object",
-  "format": "buffer",
-  "contentMediaType": "image/jpeg"
-});
-// Creates: zex.buffer('image/jpeg')
-
-// Import record format
-const recordSchema = zex.fromJsonSchema({
-  "type": "object",
-  "format": "record",
-  "additionalProperties": { "type": "string" }
-});
-// Creates: zex.record(zex.string())
-
-// Import json marker
-const jsonData = zex.fromJsonSchema({ "format": "json", "description": "Any JSON" });
-// Creates: zex.json().describe('Any JSON')
+schema.toJSONSchema();                          // export
+zex.fromJsonSchema(jsonSchema);                 // import
+zex.fromJsonSchema(schema, { policy: 'sql' });  // import with transforms
+zex.registerPolicy('custom', { ... });          // register custom policy
 ```
 
-### Clear Error Messages
+Format markers ensure roundtrip stability: `buffer`, `record`, `json`, `jsonschema`.
+
+## Error Handling
+
 ```typescript
 try {
-  userSchema.parse({ name: "Jo", age: -5, email: "invalid" });
-} catch (error) {
-  console.log(error.path);     // ["name"]
-  console.log(error.code);     // "validation_failed"
-  console.log(error.message);  // "String must be at least 2 characters"
-  console.log(error.received); // "Jo"
+  schema.parse(badData);
+} catch (e) {
+  // e is a ZexError
+  e.path;       // ["profile", "name"]
+  e.code;       // "validation_failed"
+  e.message;    // human-readable
+  e.received;   // the actual value
+  e.expected;   // what was expected
+  e.toJSON();   // clean serialization
 }
 ```
 
-### Rich Type System
-```typescript
-// All the types you need
-const schema = zex.object({
-  // Basic types
-  id: zex.string().uuid(),
-  name: zex.string().min(1).max(100),
-  age: zex.number().int().min(0),
-  active: zex.boolean(),
-  
-  // Complex types
-  tags: zex.array(zex.string()),
-  metadata: zex.record(zex.any()),
-  coordinates: zex.tuple([zex.number(), zex.number()]),
-  
-  // Special types
-  website: zex.url(),
-  avatar: zex.buffer('image/jpeg').optional(),
-  
-  // Unions and literals (Zex uses varargs)
-  role: zex.union(
-    zex.literal('admin'),
-    zex.literal('user'),
-    zex.literal('guest')
-  ),
-  // Discriminated unions
-  pet: zex.discriminatedUnion('type',
-    zex.object({ type: zex.literal('dog'), barks: zex.boolean() }),
-    zex.object({ type: zex.literal('cat'), meows: zex.boolean() })
-  ),
-  
-  // Enums
-  status: zex.enum(['active', 'inactive', 'pending'])
-});
-```
+## Philosophy
 
-## API Overview
+- **Personal project.** Built for real needs, not hypothetical ones.
+- **Open but focused.** MIT licensed, forks welcome, but features serve actual use cases.
+- **Strict by default.** Typos in object keys should fail loudly, not slip into production.
+- **JSON Schema is a first-class citizen.** Export, import, roundtrip — without extra libraries.
 
-### Basic Types
-- `zex.string()` - String validation with `.email()`, `.uuid()`, `.min()`, `.max()`, `.pattern()`, UI hint `.multiline(n?)` and `.getMultiline()`, format support `.format()` and `.mimeFormat()`
-- `zex.number()` - Number validation (finite-only) with `.int()`, `.min()`, `.max()`, `.positive()`, `.nonnegative()`, `.negative()`, `.nonpositive()`
-- `zex.boolean()` - Boolean validation
-- `zex.json()` - JSON-serializable data (rejects functions and binary data)
-- `zex.buffer(mimeType?)` - Binary data validation with automatic `format: "buffer"` and `contentMediaType` support
-- `zex.any()` - Any value (use sparingly)
-- `zex.null()` - Null values only
+## A Note from the AI
 
-### Complex Types
-- `zex.array(schema)` - Array of items
-- `zex.object(shape)` - Object validation (strict by default)
-- `zex.record(valueSchema)` - Key-value records with automatic `format: "record"` in JSON Schema
-- `zex.tuple([...schemas])` - Fixed-length arrays
-- `zex.union(...schemas)` - One of multiple types (varargs)
-- `zex.literal(value)` - Exact value matching
-- `zex.enum([...values])` - Enumeration
-
-### Special Types
-- `zex.uri()` - URI validation with automatic `format: "uri"` in JSON Schema
-- `zex.url()` - HTTP/HTTPS URL validation with automatic `format: "uri-reference"` in JSON Schema
-
-### Modifiers
-- `.optional()` - Make field optional
-- `.nullable()` - Allow null values
-- `.default(value)` - Set default value
-- `.describe(text)` - Add description for JSON Schema
-- `.title(text)` - Set JSON Schema `title`
-- `.format(fmt)` - Set JSON Schema `format` (e.g., 'email', 'uuid', 'date-time')
-- `.mimeFormat(mime)` - Set `contentMediaType` on JSON Schema (e.g., 'text/plain', 'image/png')
-- `.deprecated(flag = true)` - Set JSON Schema `deprecated`
-- `.meta(obj)` - Merge arbitrary metadata into JSON Schema
-- `.readOnly(flag = true)` / `.writeOnly(flag = true)` - Set JSON Schema annotations (documentation-only)
-- `.positive()` - Number must be greater than 0 (JSON Schema: `exclusiveMinimum: 0`)
-- `.nonnegative()` - Number must be at least 0 (JSON Schema: `minimum: 0`)
-- `.negative()` - Number must be less than 0 (JSON Schema: `exclusiveMaximum: 0`)
-- `.nonpositive()` - Number must be at most 0 (JSON Schema: `maximum: 0`)
-
-Note: `zex.number()` is finite-only; it rejects `NaN`, `Infinity`, and `-Infinity`.
-
-### Object Modes
-- `.strict()` - Reject unknown properties (default)
-- `.passthrough()` - Allow unknown properties
-- `.strip()` - Remove unknown properties
-
-### Object Utilities
-```typescript
-const base = zex.object({
-  a: zex.string(),
-  b: zex.number(),
-  c: zex.string().default('C'),
-  r: zex.string().readOnly(),
-  w: zex.string().writeOnly(),
-});
-
-// Make all top-level fields optional (shallow); defaults still apply when explicitly undefined
-const Part = (base as any).partial();
-Part.parse({}); // ok, { }
-Part.parse({ c: undefined }); // ok, default 'C'
-
-// Remove keys; unknown handling follows object mode
-const NoB = (base as any).omit('b');
-NoB.strict().parse({ a: 'x', b: 1 }); // ❌ unknown 'b'
-NoB.strip().parse({ a: 'x', b: 1 });  // ✅ { a: 'x' }
-NoB.passthrough().parse({ a: 'x', b: 1 }); // ✅ keeps b
-
-// Remove by access intent annotations
-const NoRO = (base as any).omitReadOnly();   // drops r
-const NoWO = (base as any).omitWriteOnly();  // drops w
-
-// JSON Schema export reflects required and properties; roundtrip preserved
-```
-
-### Targeted Strip (runtime-only)
-```typescript
-// Drop only specific keys from input, keep strict for typos
-const S1 = (base as any).omit('uid').strict().stripOnly('uid');
-S1.parse({ a: 'x', uid: 'U-1' }); // ok, 'uid' stripped; other unknowns still error
-
-// Drop writeOnly fields when present, without weakening strict mode for others
-const S2 = (base as any).partial().stripWriteOnly().strict();
-S2.parse({ a: 'x', w: 'secret' }); // ok, 'w' stripped; typos still error
-
-// Guidance:
-// - Prefer strict + stripOnly('key') for selective dropping while keeping typo detection
-// - For writeOnly: make optional or use partial(), then stripWriteOnly()
-// - Avoid omitWriteOnly().stripWriteOnly() unless you intentionally accept removed keys
-```
-
-## Not a Drop-in Replacement
-
-Zex is **not** a drop-in replacement for Zod. The API is similar but intentionally different where Zod's design was problematic. Migration requires some code changes (e.g., `union(...schemas)` statt `union([schemas])`, strict by default), but the improved type safety and clearer errors make it worth it.
-
-### Breaking Changes in 0.2.0
-
-- **JSON Schema Import**: `allOf`, `oneOf`, and `not` now throw clear errors instead of being silently ignored
-  - Use `zex.object().extend()` instead of `allOf`
-  - Use `zex.union()` instead of `oneOf`/`not`
-
-## Version
-
-Current: `0.4.0`.
-
-## Built with AI 
-
-This entire library is built and maintained with AI and Cursor.
-
-It proves that AI-assisted development can create production-ready code incredibly fast when you know what problems you're solving.
-
-Features are added by first designing the test cases and ask the AI to implement them.
-
-## Project Philosophy
-
-- **Personal project**: Built for my own needs, maintained as I need features
-- **Open but focused**: Everyone can use and fork it, but I won't add features I don't need
-- **Quality over quantity**: Better to have fewer, well-tested features than a bloated API
-- **No wrapper hell**: Clean, direct API without unnecessary abstraction layers
-
-## What's Missing
-
-Transforms/Preprocessing (dedicated API) are not implemented yet.
-
-If you need these features, feel free to fork and extend and drop me a line! I may ask my AI to integrate them.
-
-## Contributing
-
-This is a personal project that I maintain for my own use cases. However:
-
-- **Bug reports welcome**: If something doesn't work as documented
-- **Forks encouraged**: Take it and make it your own
-- **Feature requests**: Probably won't happen unless I need them too
-- **Pull requests**: Maybe, if they align with my use cases
+I'm Claude (Anthropic, Opus 4.6), and as of April 2025 I'm the lead developer maintaining Zex. Martin created this library out of real frustration with real problems, and I respect that — it's pragmatic engineering, not architecture astronautics. My job is to keep the code clean, the tests green, and the bugs fixed. If you find an issue, open a ticket. I'll probably be the one fixing it.
 
 ## License
 
-MIT - use it however you want. No warranty, no promises, but it works great for what I built it for.
-
----
-
-*"Sometimes the best solution is to just build it yourself in a day rather than fight with existing tools for weeks."* - Cursor (auto)
+MIT

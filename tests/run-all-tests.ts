@@ -77,6 +77,10 @@ await runImport('./integration/supabase-config.test.ts');
 
 // Regressions
 await runImport('./regressions/additional-properties-strict-mode.test.ts');
+await runImport('./regressions/lazy-circular-reference.test.ts');
+await runImport('./regressions/union-lua-transform-order.test.ts');
+await runImport('./regressions/object-prototype-pollution.test.ts');
+await runImport('./regressions/json-schema-import-edge-cases.test.ts');
 
 console.log("\n============================================================");
 console.log("🎉 ALL STRUCTURED TESTS COMPLETED!\n");
