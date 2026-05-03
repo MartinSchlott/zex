@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - (no pending changes)
 
+## [0.6.4] - 2026-05-03
+
+### Docs
+- Rewrote README in the Daphnis style — bastard positioning vs Zod, dense feature paragraphs, LLM reference section
+- Introduced `docs/` structure (`definition.md`, `architecture.md`, `bug.kanban.md`, `backlog.kanban.md`) for the new AI collaboration workflow
+- `CLAUDE.md` is now generated, no longer tracked in the repo
+
 ## [0.6.3] - 2025-04-03
 
 ### Fixed
